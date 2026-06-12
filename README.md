@@ -1,91 +1,205 @@
-# obsidian-enhancing-mindmap-plugin
-[English](https://github.com/MarkMindCkm/obsidian-enhancing-mindmap) [中文](https://github.com/MarkMindCkm/obsidian-enhancing-mindmap/blob/main/Readme-zh.md)
+# MindMark
 
-![test](https://user-images.githubusercontent.com/18719494/124454742-63ec8580-ddbb-11eb-8da0-7cd44f38a225.gif)
+MindMark is a local Obsidian plugin for editing Markdown files as mind maps. It is maintained as the source project for the plugin installed in the user's Obsidian vault.
 
-## Will output this markdown:
+This repository lives at:
 
+```text
+/Volumes/WORKSYSN/SynologyDrive/00-开发项目/mindmark
 ```
----
 
+The Obsidian runtime plugin lives at:
+
+```text
+/Users/ian/Library/Mobile Documents/iCloud~md~obsidian/Documents/Obsidian/.obsidian/plugins/mindmark
+```
+
+## Current Plugin Identity
+
+The active Obsidian plugin ID is:
+
+```text
+mindmark
+```
+
+The custom view type is:
+
+```text
+mindmapViewUpgraded
+```
+
+Do not confuse this project with the older plugin IDs or folders:
+
+- `obsidian-enhancing-mindmap`
+- `obsidian-enhancing-mindmap-upgraded`
+
+Those names come from the upstream project and earlier local experiments. The maintained local plugin is `mindmark`.
+
+## What It Does
+
+MindMark converts Markdown files with this frontmatter into an editable mind map:
+
+```markdown
+---
 mindmap-plugin: basic
-
 ---
-
-# Enhancing Mind map
-
-## Links
-- <https://github.com/MarkMindLtd/obsidian-enhancing-mindmap>
-- [GitHub](https://github.com/MarkMindLtd/obsidian-enhancing-mindmap)
-
-## Related
-- [coc-markmap](https://github.com/gera2ld/coc-markmap)
-- [gatsby-remark-markmap](https://github.com/gera2ld/gatsby-remark-markmap)
-
-## Features
-- links
-- **inline** ~~text~~ *styles*
-- multiline
-   text
-- `inline code`
-- Katex - $x = {-b \pm \sqrt{b^2-4ac} \over 2a}$
 ```
 
-### notice
+It supports a practical subset of Markdown:
 
-The plug-in only support a limited markdown format 
+- Headings and unordered lists as mind map structure
+- Inline styles such as bold, italic, strikethrough, code, links, and embeds
+- Basic Obsidian internal links and hover previews
+- Export to image/HTML flows inherited from the original plugin
 
-## Short cuts
+The plugin is optimized for the user's Obsidian vault workflow, not for publishing as a generic community plugin at this stage.
 
-| New Mind Map              | Ctrl/Cmd+P       |
-| ------------------------- | ---------------- |
-| New child node            | Tab              |
-| New brother node          | enter            |
-| Delete node               | Delete           |
-| edit node                 | Space/dblclick node|
-| Undo                      | Ctrl/Cmd+Z       |
-| Redo                      | Ctrl/Cmd+Y       |
-| Quit edit node            | Tab              |
-| Expand node               | Ctrl/Cmd + /     |
-| Collapse node             | Ctrl/Cmd + /     |
-| Move node to another node  | Drag and drop node |
-| Tab node                 | Up/down/left/right |
-| Zoom in/out              | Ctrl/Cmd + mouse wheel|
-| Zoom in                  | Ctrl/Cmd + =       |
-| Zoom out                 | Ctrl/Cmd + -       |
-| mind map to center          | Ctrl/Cmd + E |
+## Main Commands
 
-## Features
+Common command IDs are registered under `mindmark`:
 
-1. edit node
-2. drag node to another node
-3. undo/redo
-4. toggle between mindmap and markdown views  
-5. synchronize data between boards
-...
+```text
+mindmark:Create New MindMap
+mindmark:Set to mindmap view
+mindmark:Set to markdown view
+mindmark:Toggle to markdown or mindmap
+mindmark:Insert child
+mindmark:Add sibling/end editing
+mindmark:Undo
+mindmark:Redo
+mindmark:Export to PNG
+mindmark:Export to JPEG
+```
 
-![test (2)](https://user-images.githubusercontent.com/18719494/124458786-fd1d9b00-ddbf-11eb-8dbc-eeefb5b7abf5.gif)
+Keyboard behavior in the mind map view includes:
 
-## Manual installation
-1. Download the latest release
-2. Extract the obsidian-enhancing-mindmap folder from the zip to your vault's plugins folder: <vault>/.obsidian/plugins/
-3. Note: On some machines the .obsidian folder may be hidden. On MacOS you should be able to press Command+Shift+Dot to show the folder in Finder.
-4. Reload Obsidian
-5. If prompted about Safe Mode, you can disable safe mode and enable the plugin.
+- `Tab`: add child node
+- `Enter`: add sibling node
+- `Delete` / `Backspace`: delete selected node
+- `Space` / double-click: edit node
+- Arrow keys: navigate nodes
+- `F`: toggle focus mode on the selected node
+- `Esc`: exit focus mode or cancel editing
+- `Cmd/Ctrl + Z`: undo
+- `Cmd/Ctrl + Y`: redo
 
+## Project Structure
 
-## Plans 
-1. more theme
-2. more mind map layouts
-3. save to image/opml
-4. imports opml/xmind
+```text
+src/main.ts                 Obsidian plugin entrypoint and command registration
+src/MindMapView.ts          Obsidian TextFileView wrapper for mind map files
+src/mindmap/mindmap.ts      Main runtime controller, events, layout refresh, focus mode
+src/mindmap/Layout.ts       Node placement and SVG edge drawing
+src/mindmap/INode.ts        Node DOM, editing, Markdown rendering, link/embed behavior
+src/mindmap/Execute.ts      Command dispatcher around undoable operations
+src/mindmap/Cmds.ts         Undo/redo command implementations
+src/mindmap/FileSuggest.ts  Obsidian file suggestion support for node editing
+src/utils.ts                Shared utilities such as uuid()
+styles.css                  Runtime plugin styling
+main.js                     Generated Rollup bundle loaded by Obsidian
+```
 
-## For developers
-Pull requests are both welcome and appreciated. 😀
+`main.js` is generated but intentionally committed because Obsidian loads the bundled plugin file directly.
 
-## Donating
-https://www.buymeacoffee.com/markmind  
-<a href="https://www.buymeacoffee.com/markmind"><img src="https://img.buymeacoffee.com/button-api/?text=Buy me a coffee&emoji=&slug=markmind&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff"></a>
+## Development
 
+Install dependencies:
 
+```bash
+npm install
+```
 
+Build:
+
+```bash
+npm run build
+```
+
+The expected clean build output is:
+
+```text
+src/main.ts -> ....
+created . in ...
+```
+
+There should be no TypeScript warnings and no Rollup circular dependency warnings.
+
+## Deploy To The Local Obsidian Plugin
+
+After building in this repo, copy the generated runtime files into the active Obsidian plugin directory:
+
+```bash
+cp main.js styles.css "/Users/ian/Library/Mobile Documents/iCloud~md~obsidian/Documents/Obsidian/.obsidian/plugins/mindmark/"
+```
+
+Then reload the plugin:
+
+```bash
+obsidian plugin:reload id=mindmark
+```
+
+If the plugin is disabled:
+
+```bash
+obsidian plugin:enable id=mindmark filter=community
+obsidian plugin:reload id=mindmark
+```
+
+## Verification
+
+Open a known mind map file:
+
+```bash
+obsidian open path='00-INBOX/未命名思维导图.md'
+obsidian command id='mindmark:Set to mindmap view'
+```
+
+Check the workspace:
+
+```bash
+obsidian workspace
+```
+
+Expected active tab:
+
+```text
+[mindmapViewUpgraded] 未命名思维导图
+```
+
+Check runtime errors:
+
+```bash
+obsidian dev:errors
+```
+
+Expected:
+
+```text
+No errors captured.
+```
+
+Optional DOM sanity check:
+
+```bash
+obsidian eval code="JSON.stringify({mindmaps:document.querySelectorAll('.mm-mindmap').length,nodes:document.querySelectorAll('.mm-node').length,paths:document.querySelectorAll('.mm-mindmap svg path').length})"
+```
+
+Expected: at least one mind map, several nodes, and SVG paths when a mind map view is open.
+
+## Recent Important Fixes
+
+The current local changes include:
+
+- Focus mode now hides both out-of-scope nodes and their SVG edges.
+- `Layout` receives the active `MindMap` instance directly, avoiding `Cannot read properties of null (reading 'edgeGroup')` during resize/update.
+- `uuid()` was moved to `src/utils.ts` to remove runtime circular imports.
+- TypeScript warnings from older Obsidian type definitions were fixed with local compatibility casts.
+- `inlineSourceMap` was disabled to avoid Rollup sourcemap configuration warnings.
+
+## Notes For Future Work
+
+- Keep source edits in this repo, not inside the Obsidian runtime plugin folder.
+- Always build before copying `main.js` to the vault plugin folder.
+- If Obsidian reports old errors, clear the buffer with `obsidian dev:errors clear` before retesting.
+- The repository remote still points at the original upstream unless intentionally changed.
+- `node_modules` is local build state and should not be committed.
