@@ -39470,6 +39470,7 @@ class MindMapPlugin extends obsidian.Plugin {
         this.mindmapFileModes = {};
         this._loaded = false;
         this.timeOut = null;
+        this.markdownMindMapActions = new WeakMap();
     }
     onload() {
         return __awaiter(this, void 0, void 0, function* () {
@@ -40511,6 +40512,9 @@ class MindMapPlugin extends obsidian.Plugin {
             this.registerView(mindmapViewType, (leaf) => new MindMapView(leaf, this));
             this.registerEvents();
             this.registerMonkeyAround();
+            this.app.workspace.onLayoutReady(() => {
+                this.updateMarkdownMindMapActions();
+            });
             this.addSettingTab(new MindMapSettingsTab(this.app, this));
         });
     }
@@ -40531,6 +40535,10 @@ class MindMapPlugin extends obsidian.Plugin {
         var _a, _b;
         this.app.workspace.detachLeavesOfType(mindmapViewType);
         (_b = (_a = this.app.workspace).unregisterHoverLinkSource) === null || _b === void 0 ? void 0 : _b.call(_a, mindmapHoverSource);
+        this.app.workspace.getLeavesOfType("markdown").forEach((leaf) => {
+            const action = this.markdownMindMapActions.get(leaf.view);
+            action === null || action === void 0 ? void 0 : action.remove();
+        });
     }
     newMindMap(folder) {
         var _a;
@@ -40583,6 +40591,7 @@ class MindMapPlugin extends obsidian.Plugin {
                 state: leaf.view.getState(),
                 popstate: true,
             }, { focus: true });
+            this.updateMarkdownMindMapActions();
         });
     }
     setMindMapView(leaf) {
@@ -40594,8 +40603,41 @@ class MindMapPlugin extends obsidian.Plugin {
             });
         });
     }
+    updateMarkdownMindMapActions() {
+        this.app.workspace.getLeavesOfType("markdown").forEach((leaf) => {
+            var _a, _b;
+            const view = leaf.view;
+            const file = view.file;
+            const cache = file ? this.app.metadataCache.getFileCache(file) : null;
+            const shouldShow = Boolean((_a = cache === null || cache === void 0 ? void 0 : cache.frontmatter) === null || _a === void 0 ? void 0 : _a[frontMatterKey]);
+            let action = this.markdownMindMapActions.get(view);
+            if (!shouldShow) {
+                action === null || action === void 0 ? void 0 : action.remove();
+                this.markdownMindMapActions.delete(view);
+                return;
+            }
+            if (!(action === null || action === void 0 ? void 0 : action.isConnected)) {
+                action = view.addAction(mindmapIcon, t("Open as mindmap board"), () => __awaiter(this, void 0, void 0, function* () {
+                    if (!view.file) {
+                        return;
+                    }
+                    this.mindmapFileModes[leaf.id || view.file.path] = mindmapViewType;
+                    yield this.setMindMapView(leaf);
+                }));
+                action.addClass("mindmark-return-action");
+                (_b = view.modeButtonEl) === null || _b === void 0 ? void 0 : _b.after(action);
+                this.markdownMindMapActions.set(view, action);
+            }
+        });
+    }
     registerEvents() {
         var _a, _b;
+        this.registerEvent(this.app.workspace.on("layout-change", () => {
+            this.updateMarkdownMindMapActions();
+        }));
+        this.registerEvent(this.app.workspace.on("file-open", () => {
+            this.updateMarkdownMindMapActions();
+        }));
         this.registerEvent(this.app.workspace.on("file-menu", (menu, file, source, leaf) => {
             // Add a menu item to the folder context menu to create a board
             if (file instanceof obsidian.TFolder) {
@@ -40624,6 +40666,7 @@ class MindMapPlugin extends obsidian.Plugin {
             }
         }));
         this.registerEvent(this.app.metadataCache.on("changed", (file) => {
+            this.updateMarkdownMindMapActions();
             this.app.workspace.getLeavesOfType(mindmapViewType).forEach((leaf) => {
                 const view = leaf.view;
                 if (view && typeof view.onFileMetadataChange === 'function') {

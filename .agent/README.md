@@ -81,6 +81,10 @@ Expected `activeType` is `mindmapViewUpgraded`.
 
 ## Recent Bugs And Fixes
 
+### Markdown view return button
+
+Mind map files displayed as Markdown have a `blocks` action beside the Markdown reading/editing mode button. `MindMapPlugin.updateMarkdownMindMapActions()` owns this button, shows it only when the file has `mindmap-plugin` frontmatter, and prevents duplicate actions across layout updates.
+
 ### Collapsing hid edges but not child nodes
 
 Symptom: clicking a node's collapse dot removed its edges while child nodes remained visible.

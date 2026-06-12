@@ -11,7 +11,7 @@ import { around } from 'monkey-around'
 import { MindMapSettings } from './settings';
 import { MindMapSettingsTab } from './settingTab'
 
-import { MindMapView, mindmapViewType } from "./MindMapView";
+import { MindMapView, mindmapIcon, mindmapViewType } from "./MindMapView";
 import { frontMatterKey, basicFrontmatter, mindmapHoverSource } from './constants';
 import { t } from './lang/helpers'
 
@@ -21,6 +21,7 @@ export default class MindMapPlugin extends Plugin {
   mindmapFileModes: { [file: string]: string } = {};
   _loaded: boolean = false;
   timeOut: any = null;
+  markdownMindMapActions = new WeakMap<MarkdownView, HTMLElement>();
 
   async onload() {
 
@@ -1165,6 +1166,9 @@ export default class MindMapPlugin extends Plugin {
     this.registerView(mindmapViewType, (leaf) => new MindMapView(leaf, this));
     this.registerEvents();
     this.registerMonkeyAround();
+    this.app.workspace.onLayoutReady(() => {
+      this.updateMarkdownMindMapActions();
+    });
 
 
     this.addSettingTab(new MindMapSettingsTab(this.app, this));
@@ -1188,6 +1192,10 @@ export default class MindMapPlugin extends Plugin {
 
     this.app.workspace.detachLeavesOfType(mindmapViewType);
     (this.app.workspace as any).unregisterHoverLinkSource?.(mindmapHoverSource);
+    this.app.workspace.getLeavesOfType("markdown").forEach((leaf) => {
+      const action = this.markdownMindMapActions.get(leaf.view as MarkdownView);
+      action?.remove();
+    });
 
   }
 
@@ -1247,6 +1255,7 @@ export default class MindMapPlugin extends Plugin {
       } as ViewState,
       { focus: true }
     );
+    this.updateMarkdownMindMapActions();
   }
 
   async setMindMapView(leaf: WorkspaceLeaf) {
@@ -1257,7 +1266,48 @@ export default class MindMapPlugin extends Plugin {
     } as ViewState);
   }
 
+  updateMarkdownMindMapActions() {
+    this.app.workspace.getLeavesOfType("markdown").forEach((leaf) => {
+      const view = leaf.view as MarkdownView;
+      const file = view.file;
+      const cache = file ? this.app.metadataCache.getFileCache(file) : null;
+      const shouldShow = Boolean(cache?.frontmatter?.[frontMatterKey]);
+      let action = this.markdownMindMapActions.get(view);
+
+      if (!shouldShow) {
+        action?.remove();
+        this.markdownMindMapActions.delete(view);
+        return;
+      }
+
+      if (!action?.isConnected) {
+        action = view.addAction(mindmapIcon, t("Open as mindmap board"), async () => {
+          if (!view.file) {
+            return;
+          }
+          this.mindmapFileModes[(leaf as any).id || view.file.path] = mindmapViewType;
+          await this.setMindMapView(leaf);
+        });
+        action.addClass("mindmark-return-action");
+        (view as any).modeButtonEl?.after(action);
+        this.markdownMindMapActions.set(view, action);
+      }
+    });
+  }
+
   registerEvents() {
+    this.registerEvent(
+      this.app.workspace.on("layout-change", () => {
+        this.updateMarkdownMindMapActions();
+      })
+    );
+
+    this.registerEvent(
+      this.app.workspace.on("file-open", () => {
+        this.updateMarkdownMindMapActions();
+      })
+    );
+
     this.registerEvent(
       this.app.workspace.on("file-menu", (menu, file: TFile,source:string,leaf?:WorkspaceLeaf) => {
         // Add a menu item to the folder context menu to create a board
@@ -1292,6 +1342,7 @@ export default class MindMapPlugin extends Plugin {
 
     this.registerEvent(
       this.app.metadataCache.on("changed", (file) => {
+        this.updateMarkdownMindMapActions();
         this.app.workspace.getLeavesOfType(mindmapViewType).forEach((leaf) => {
           const view = leaf.view as MindMapView;
           if (view && typeof view.onFileMetadataChange === 'function') {
