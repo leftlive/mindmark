@@ -53,16 +53,12 @@ export default class Exec{
                     this.history.execute(new cmd.RemoveNode(node, node.mindmap));
                 }
                 break;
-            case 'deleteNodeExcludeChild':
-                break;
             case 'changeNodeText':
                 if(data){
                     this.history.execute(new cmd.ChangeNodeText(data.node, data.oldText, data.text));
                 }
                 break;
             case 'moveNode':
-                console.log("inHistory:");
-                console.log(data.inHistory);
                 if(data.inHistory === undefined || data.inHistory == true) {
                     if(data){
                     this.history.execute(new cmd.MoveNode(data));

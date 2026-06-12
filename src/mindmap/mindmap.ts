@@ -74,6 +74,8 @@ export default class MindMap {
     isComposing = false;
     isFocused = true;
     fileSuggest: FileSuggest;
+    renderRefreshFrame: number | null = null;
+    isInitializingNodes = false;
 
     constructor(data: INodeData, containerEL: HTMLElement, setting?: Setting, view?: MindMapView) {
         this.setting = Object.assign({
@@ -256,6 +258,8 @@ export default class MindMap {
         var x = this.setting.canvasSize / 2 - 60;
         var y = this.setting.canvasSize / 2 - 200;
         var waitCollapseNodes:INode[]=[];
+        var nodeFragment = document.createDocumentFragment();
+        this.isInitializingNodes = true;
 
         function initNode(d: INodeData, isRoot: boolean, p?: INode) {
             that._nodeNum++;
@@ -267,7 +271,7 @@ export default class MindMap {
             //     n.isHide = true;
             // }
 
-            that.contentEL.appendChild(n.containEl);
+            nodeFragment.appendChild(n.containEl);
             if (isRoot) {
                 n.setPosition(x, y);
                 that.root = n;
@@ -278,12 +282,9 @@ export default class MindMap {
                 n.parent = p;
             }
 
-            n.refreshBox();
-
             if(!d.expanded){
                 waitCollapseNodes.push(n)
             }
-            n.refreshBox();
             if (d.children && d.children.length) {
                 d.children.forEach((dd: INodeData) => {
                     initNode(dd, false, n);
@@ -291,6 +292,7 @@ export default class MindMap {
             }
         }
         initNode(data, true);
+        this.contentEL.appendChild(nodeFragment);
 
         if(waitCollapseNodes.length){
             waitCollapseNodes.forEach(n=>{
@@ -415,7 +417,7 @@ export default class MindMap {
         this.appEl.removeEventListener('dragstart', this.appDragstart);
         this.appEl.removeEventListener('dragover', this.appDragover);
         this.appEl.removeEventListener('dragend', this.appDragend);
-        this.appEl.removeEventListener('dblClick', this.appDblclickFn);
+        this.appEl.removeEventListener('dblclick', this.appDblclickFn);
         this.appEl.removeEventListener('mouseover', this.appMouseOverFn);
         this.appEl.removeEventListener('drop', this.appDrop);
         document.removeEventListener('keyup', this.appKeyup);
@@ -438,6 +440,10 @@ export default class MindMap {
         this.off('initNode', this.initNode);
         this.off('renderEditNode', this.renderEditNode);
         this.off('mindMapChange', this.mindMapChange);
+        if (this.renderRefreshFrame !== null) {
+            cancelAnimationFrame(this.renderRefreshFrame);
+            this.renderRefreshFrame = null;
+        }
     }
 
     initNode(evt: CustomEvent) {
@@ -445,15 +451,35 @@ export default class MindMap {
         //console.log(this._nodeNum,this._tempNum);
 
         if (this._tempNum == this._nodeNum) {
+            this.isInitializingNodes = false;
+            this.refreshNodeBoxes();
             this.refresh();
+            this.emit('initialLayoutComplete');
             //this.center();
         }
+    }
+
+    refreshNodeBoxes() {
+        this.traverseBF((n: INode) => {
+            n.refreshBox();
+        });
     }
 
     renderEditNode(evt: CustomEvent) {
         var node = evt.detail.node || null;
         node?.clearCacheData();
-        this.refresh();
+        this.requestRenderRefresh();
+    }
+
+    requestRenderRefresh() {
+        if (this.renderRefreshFrame !== null) {
+            return;
+        }
+
+        this.renderRefreshFrame = requestAnimationFrame(() => {
+            this.renderRefreshFrame = null;
+            this.refresh();
+        });
     }
 
     mindMapChange() {
@@ -2003,6 +2029,7 @@ export default class MindMap {
     clear() {
         this.clearNode();
         this.removeEvent();
+        this.fileSuggest?.destroy();
         this.draw?.clear();
     }
     //get node list rect point
@@ -2169,12 +2196,10 @@ export default class MindMap {
     }
     undo() {
         this.exec.undo();
-        console.log("Undo");
     }
 
     redo() {
         this.exec.redo();
-        console.log("Redo");
     }
 
     addNode(node: INode, parent?: INode, index = -1) {
@@ -2676,7 +2701,7 @@ export default class MindMap {
                    navigator.clipboard.writeText('');
                   }
             }catch(err){
-                console.log(err)
+                console.error(err)
             }
         }
 

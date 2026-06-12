@@ -122,7 +122,9 @@ export default class Node {
         }
         MarkdownRenderer.renderMarkdown( this.data.text ,this.contentEl,this.mindmap.path||"",null).then(()=>{
             this.data.mdText = this.contentEl.innerHTML;
-            this.refreshBox();
+            if (!this.mindmap?.isInitializingNodes) {
+                this.refreshBox();
+            }
             this.mindmap&&this.mindmap.emit('initNode',{});
             this._delay();
         });
@@ -545,10 +547,9 @@ export default class Node {
         if(!this.data.isEdit) return;
         this.mindmap.fileSuggest?.close();
         this.contentEl.removeEventListener('input', this._inputHandler);
-        this.contentEl.removeEventListener('keydown', this._keydownHandler);
+       this.contentEl.removeEventListener('keydown', this._keydownHandler);
         this.contentEl.removeAttribute('contentEditable');
-        
-        console.log("CancelEdit");
+
         var text = this.contentEl.innerText.trim()||'';
         if(text.length == 0){
             text = this._oldText

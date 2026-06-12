@@ -442,7 +442,7 @@ function t(str) {
     return (locale && locale[str]) || en[str];
 }
 
-const FRONT_MATTER_REGEX = /^(---)$.+?^(---)$.*?/ims;
+const FRONT_MATTER_REGEX = /^---\s*\n[\s\S]*?\n---\s*\n?/;
 const frontMatterKey = 'mindmap-plugin';
 const mindmapHoverSource = 'mindmark';
 const basicFrontmatter = [
@@ -522,8 +522,11 @@ class Node$1 {
             this.data.text = t("Sub title");
         }
         obsidian.MarkdownRenderer.renderMarkdown(this.data.text, this.contentEl, this.mindmap.path || "", null).then(() => {
+            var _a;
             this.data.mdText = this.contentEl.innerHTML;
-            this.refreshBox();
+            if (!((_a = this.mindmap) === null || _a === void 0 ? void 0 : _a.isInitializingNodes)) {
+                this.refreshBox();
+            }
             this.mindmap && this.mindmap.emit('initNode', {});
             this._delay();
         });
@@ -895,7 +898,6 @@ class Node$1 {
         this.contentEl.removeEventListener('input', this._inputHandler);
         this.contentEl.removeEventListener('keydown', this._keydownHandler);
         this.contentEl.removeAttribute('contentEditable');
-        console.log("CancelEdit");
         var text = this.contentEl.innerText.trim() || '';
         if (text.length == 0) {
             text = this._oldText;
@@ -7732,16 +7734,12 @@ class Exec {
                     this.history.execute(new RemoveNode(node, node.mindmap));
                 }
                 break;
-            case 'deleteNodeExcludeChild':
-                break;
             case 'changeNodeText':
                 if (data) {
                     this.history.execute(new ChangeNodeText(data.node, data.oldText, data.text));
                 }
                 break;
             case 'moveNode':
-                console.log("inHistory:");
-                console.log(data.inHistory);
                 if (data.inHistory === undefined || data.inHistory == true) {
                     if (data) {
                         this.history.execute(new MoveNode(data));
@@ -7816,6 +7814,10 @@ class FileSuggest {
     close() {
         this.isOpen = false;
         this.containerEl.style.display = 'none';
+    }
+    destroy() {
+        this.close();
+        this.containerEl.remove();
     }
     updateSuggestions() {
         const allFiles = this.app.vault.getMarkdownFiles();
@@ -7895,17 +7897,16 @@ class FileSuggest {
             const textBeforeCursor = preCursorRange.toString();
             const matchIndex = textBeforeCursor.lastIndexOf('[[');
             if (matchIndex !== -1) {
-                // Delete everything from [[ to the cursor
-                textBeforeCursor.length - matchIndex;
-                // Expand range backwards to delete the [[ and query
-                range.endOffset;
-                range.endContainer;
-                // A simpler approach for contentEditable:
-                // Just replace the text content, since we don't have complex HTML inside during edit mode (it's plain text).
-                const newText = text.substring(0, matchIndex) + `[[${file.basename}]]` + text.substring(textBeforeCursor.length);
+                const hasDuplicateBasename = this.app.vault.getMarkdownFiles().some((candidate) => {
+                    return candidate.path !== file.path && candidate.basename === file.basename;
+                });
+                const linkTarget = hasDuplicateBasename
+                    ? file.path.replace(/\.md$/, '')
+                    : file.basename;
+                const newText = text.substring(0, matchIndex) + `[[${linkTarget}]]` + text.substring(textBeforeCursor.length);
                 contentEl.innerText = newText;
                 // Set cursor to end of the inserted link
-                const newCursorPos = matchIndex + `[[${file.basename}]]`.length;
+                const newCursorPos = matchIndex + `[[${linkTarget}]]`.length;
                 const newRange = document.createRange();
                 // Because innerText might create new text nodes or single text node
                 if (contentEl.firstChild) {
@@ -8179,6 +8180,8 @@ class MindMap {
         this._dragType = '';
         this.isComposing = false;
         this.isFocused = true;
+        this.renderRefreshFrame = null;
+        this.isInitializingNodes = false;
         this.setting = Object.assign({
             theme: 'default',
             //canvasSize: 8000,
@@ -8334,6 +8337,8 @@ class MindMap {
         var x = this.setting.canvasSize / 2 - 60;
         var y = this.setting.canvasSize / 2 - 200;
         var waitCollapseNodes = [];
+        var nodeFragment = document.createDocumentFragment();
+        this.isInitializingNodes = true;
         function initNode(d, isRoot, p) {
             that._nodeNum++;
             var n = new Node$1(d, that);
@@ -8343,7 +8348,7 @@ class MindMap {
             // if (p && (!p.isExpand || p.isHide)) {
             //     n.isHide = true;
             // }
-            that.contentEL.appendChild(n.containEl);
+            nodeFragment.appendChild(n.containEl);
             if (isRoot) {
                 n.setPosition(x, y);
                 that.root = n;
@@ -8354,11 +8359,9 @@ class MindMap {
                 p.children.push(n);
                 n.parent = p;
             }
-            n.refreshBox();
             if (!d.expanded) {
                 waitCollapseNodes.push(n);
             }
-            n.refreshBox();
             if (d.children && d.children.length) {
                 d.children.forEach((dd) => {
                     initNode(dd, false, n);
@@ -8366,6 +8369,7 @@ class MindMap {
             }
         }
         initNode(data, true);
+        this.contentEL.appendChild(nodeFragment);
         if (waitCollapseNodes.length) {
             waitCollapseNodes.forEach(n => {
                 n.collapse();
@@ -8474,7 +8478,7 @@ class MindMap {
         this.appEl.removeEventListener('dragstart', this.appDragstart);
         this.appEl.removeEventListener('dragover', this.appDragover);
         this.appEl.removeEventListener('dragend', this.appDragend);
-        this.appEl.removeEventListener('dblClick', this.appDblclickFn);
+        this.appEl.removeEventListener('dblclick', this.appDblclickFn);
         this.appEl.removeEventListener('mouseover', this.appMouseOverFn);
         this.appEl.removeEventListener('drop', this.appDrop);
         document.removeEventListener('keyup', this.appKeyup);
@@ -8492,19 +8496,40 @@ class MindMap {
         this.off('initNode', this.initNode);
         this.off('renderEditNode', this.renderEditNode);
         this.off('mindMapChange', this.mindMapChange);
+        if (this.renderRefreshFrame !== null) {
+            cancelAnimationFrame(this.renderRefreshFrame);
+            this.renderRefreshFrame = null;
+        }
     }
     initNode(evt) {
         this._tempNum++;
         //console.log(this._nodeNum,this._tempNum);
         if (this._tempNum == this._nodeNum) {
+            this.isInitializingNodes = false;
+            this.refreshNodeBoxes();
             this.refresh();
+            this.emit('initialLayoutComplete');
             //this.center();
         }
+    }
+    refreshNodeBoxes() {
+        this.traverseBF((n) => {
+            n.refreshBox();
+        });
     }
     renderEditNode(evt) {
         var node = evt.detail.node || null;
         node === null || node === void 0 ? void 0 : node.clearCacheData();
-        this.refresh();
+        this.requestRenderRefresh();
+    }
+    requestRenderRefresh() {
+        if (this.renderRefreshFrame !== null) {
+            return;
+        }
+        this.renderRefreshFrame = requestAnimationFrame(() => {
+            this.renderRefreshFrame = null;
+            this.refresh();
+        });
     }
     mindMapChange() {
         var _a;
@@ -9718,10 +9743,11 @@ class MindMap {
         }
     }
     clear() {
-        var _a;
+        var _a, _b;
         this.clearNode();
         this.removeEvent();
-        (_a = this.draw) === null || _a === void 0 ? void 0 : _a.clear();
+        (_a = this.fileSuggest) === null || _a === void 0 ? void 0 : _a.destroy();
+        (_b = this.draw) === null || _b === void 0 ? void 0 : _b.clear();
     }
     //get node list rect point
     getBoundingRect(list) {
@@ -9862,11 +9888,9 @@ class MindMap {
     }
     undo() {
         this.exec.undo();
-        console.log("Undo");
     }
     redo() {
         this.exec.redo();
-        console.log("Redo");
     }
     addNode(node, parent, index = -1) {
         if (parent) {
@@ -10285,7 +10309,7 @@ class MindMap {
                 }
             }
             catch (err) {
-                console.log(err);
+                console.error(err);
             }
         }
     }
@@ -38916,59 +38940,55 @@ class MindMapView extends obsidian.TextFileView {
             }
         }
         catch (err) {
-            console.log(err, 'stroke array is error');
+            console.error('stroke array is error', err);
         }
         this.colors = this.colors.concat(colors);
         // We no longer add 50 random colors. Layout.ts now uses CSS variable defined theme palettes.
     }
-    exportToSvg() {
-        if (!this.mindmap) {
-            return;
-        }
-        // this.mindmap.contentEL.style.visibility='hidden';
-        var nodes = [];
-        this.mindmap.traverseDF((n) => {
-            if (n.isShow()) {
-                nodes.push(n);
+    exportToHtml() {
+        var _a;
+        return __awaiter(this, void 0, void 0, function* () {
+            if (!this.mindmap) {
+                return;
+            }
+            let exportEl = null;
+            try {
+                const snapshot = this.createExportSnapshot(this.canUseElectronCapture());
+                exportEl = snapshot.element;
+                const dataUrl = yield this.exportSnapshotToDataUrl(snapshot, 'png', 1);
+                const fileName = this.mindmap.path.replace(/\.md$/, '.html');
+                const title = ((_a = this.file) === null || _a === void 0 ? void 0 : _a.basename) || 'MindMark Export';
+                const html = [
+                    '<!DOCTYPE html>',
+                    '<html lang="en">',
+                    '<head>',
+                    '  <meta charset="UTF-8">',
+                    `  <title>${title}</title>`,
+                    '  <meta name="viewport" content="width=device-width, initial-scale=1.0">',
+                    '  <style>',
+                    '    body { margin: 0; padding: 24px; background: #f5f5f5; font-family: sans-serif; }',
+                    '    main { display: flex; justify-content: center; }',
+                    '    img { max-width: 100%; height: auto; display: block; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12); }',
+                    '  </style>',
+                    '</head>',
+                    '<body>',
+                    '  <main>',
+                    `    <img src="${dataUrl}" alt="${title}">`,
+                    '  </main>',
+                    '</body>',
+                    '</html>',
+                ].join('\n');
+                yield this.app.vault.adapter.write(fileName, html);
+                new obsidian.Notice(`Mindmap exported as HTML: ${fileName}`);
+            }
+            catch (err) {
+                console.error('Failed to export mindmap as HTML:', err);
+                new obsidian.Notice(`Failed to export mindmap as HTML: ${err}`);
+            }
+            finally {
+                exportEl === null || exportEl === void 0 ? void 0 : exportEl.remove();
             }
         });
-        var oldScrollLeft = this.mindmap.containerEL.scrollLeft;
-        var oldScrollTop = this.mindmap.containerEL.scrollTop;
-        var box = this.mindmap.getBoundingRect(nodes);
-        var rootBox = this.mindmap.root.getPosition();
-        var disX = 0, disY = 0;
-        if (box.x > 60) {
-            disX = box.x - 60;
-        }
-        if (box.y > 60) {
-            disY = box.y - 60;
-        }
-        this.mindmap.root.setPosition(rootBox.x - disX, rootBox.y - disY);
-        this.mindmap.refresh();
-        var w = box.width + 120;
-        var h = box.height + 120;
-        this.mindmap.contentEL.style.width = w + 'px';
-        this.mindmap.contentEL.style.height = h + 'px';
-        setTimeout(() => {
-            domToImageMore.toPng(this.mindmap.contentEL, {}).then(dataUrl => {
-                var img = new Image();
-                img.src = dataUrl;
-                var str = img.outerHTML;
-                const fileName = this.mindmap.path.replace(/\.md$/, '.html');
-                try {
-                    new obsidian.Notice(`Mindmap exported as HTML: ${fileName}`);
-                    this.app.vault.adapter.write(fileName, str);
-                    this.restoreMindmap(rootBox, oldScrollLeft, oldScrollTop);
-                }
-                catch (err) {
-                    this.restoreMindmap(rootBox, oldScrollLeft, oldScrollTop);
-                    new obsidian.Notice(`Failed to export mindmap: ${err}`);
-                }
-            }).catch(err => {
-                this.restoreMindmap(rootBox, oldScrollLeft, oldScrollTop);
-                new obsidian.Notice(err);
-            });
-        }, 200);
     }
     exportToPng(i_scale) {
         if (!this.mindmap) {
@@ -38990,22 +39010,11 @@ class MindMapView extends obsidian.TextFileView {
             let exportEl = null;
             const extension = format === 'png' ? '.png' : '.jpeg';
             try {
-                const snapshot = this.createExportSnapshot();
+                const snapshot = this.createExportSnapshot(this.canUseElectronCapture());
                 exportEl = snapshot.element;
-                const options = {
-                    width: snapshot.width,
-                    height: snapshot.height,
-                    scale: Math.max(1, scale),
-                    bgcolor: format === 'jpeg'
-                        ? this.getExportBackgroundColor()
-                        : undefined,
-                };
-                const dataUrl = format === 'png'
-                    ? yield domToImageMore.toPng(exportEl, options)
-                    : yield domToImageMore.toJpeg(exportEl, Object.assign(Object.assign({}, options), { quality: 1.0 }));
+                const binary = yield this.exportSnapshotToBinary(snapshot, format, Math.max(1, scale));
                 const fileName = this.mindmap.path.replace(/\.md$/, extension);
-                const arrayBuffer = yield this.dataURLtoBlob(dataUrl).arrayBuffer();
-                yield this.app.vault.adapter.writeBinary(fileName, arrayBuffer);
+                yield this.app.vault.adapter.writeBinary(fileName, binary);
                 new obsidian.Notice(`Mindmap exported as ${format.toUpperCase()}: ${fileName}`);
             }
             catch (err) {
@@ -39017,7 +39026,7 @@ class MindMapView extends obsidian.TextFileView {
             }
         });
     }
-    createExportSnapshot() {
+    createExportSnapshot(visibleForCapture) {
         if (!this.mindmap) {
             throw new Error('Mindmap is not available');
         }
@@ -39038,14 +39047,15 @@ class MindMapView extends obsidian.TextFileView {
         const sourceHeight = this.mindmap.contentEL.offsetHeight;
         const wrapper = document.createElement('div');
         wrapper.className = 'mindmark-export-snapshot';
-        wrapper.style.position = 'fixed';
-        wrapper.style.left = '-100000px';
+        wrapper.style.position = visibleForCapture ? 'absolute' : 'fixed';
+        wrapper.style.left = visibleForCapture ? '0' : '-100000px';
         wrapper.style.top = '0';
         wrapper.style.width = `${width}px`;
         wrapper.style.height = `${height}px`;
         wrapper.style.overflow = 'hidden';
         wrapper.style.pointerEvents = 'none';
         wrapper.style.background = this.getExportBackgroundColor();
+        wrapper.style.zIndex = '2147483647';
         const contentClone = this.mindmap.contentEL.cloneNode(true);
         contentClone.style.position = 'absolute';
         contentClone.style.left = `${padding - box.x}px`;
@@ -39061,6 +39071,83 @@ class MindMapView extends obsidian.TextFileView {
         document.body.appendChild(wrapper);
         return { element: wrapper, width, height };
     }
+    canUseElectronCapture() {
+        var _a;
+        if (!obsidian.Platform.isDesktopApp) {
+            return false;
+        }
+        try {
+            const electron = require('electron');
+            return Boolean((_a = electron === null || electron === void 0 ? void 0 : electron.remote) === null || _a === void 0 ? void 0 : _a.getCurrentWindow);
+        }
+        catch (err) {
+            return false;
+        }
+    }
+    exportSnapshotToDataUrl(snapshot, format, scale) {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (this.canUseElectronCapture()) {
+                return this.captureSnapshotWithElectron(snapshot, format, scale).then((image) => {
+                    return format === 'jpeg'
+                        ? `data:image/jpeg;base64,${image.toJPEG(100).toString('base64')}`
+                        : image.toDataURL();
+                });
+            }
+            const options = {
+                width: snapshot.width,
+                height: snapshot.height,
+                scale,
+                bgcolor: format === 'jpeg'
+                    ? this.getExportBackgroundColor()
+                    : undefined,
+            };
+            return format === 'png'
+                ? domToImageMore.toPng(snapshot.element, options)
+                : domToImageMore.toJpeg(snapshot.element, Object.assign(Object.assign({}, options), { quality: 1.0 }));
+        });
+    }
+    exportSnapshotToBinary(snapshot, format, scale) {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (this.canUseElectronCapture()) {
+                const image = yield this.captureSnapshotWithElectron(snapshot, format, scale);
+                const buffer = format === 'jpeg'
+                    ? image.toJPEG(100)
+                    : image.toPNG();
+                return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+            }
+            const dataUrl = yield this.exportSnapshotToDataUrl(snapshot, format, scale);
+            return this.dataURLtoBlob(dataUrl).arrayBuffer();
+        });
+    }
+    captureSnapshotWithElectron(snapshot, format, scale) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const electron = require('electron');
+            const currentWindow = electron.remote.getCurrentWindow();
+            yield this.waitForAnimationFrames(2);
+            const rect = snapshot.element.getBoundingClientRect();
+            const image = yield currentWindow.webContents.capturePage({
+                x: Math.max(0, Math.floor(rect.left)),
+                y: Math.max(0, Math.floor(rect.top)),
+                width: Math.max(1, Math.ceil(rect.width)),
+                height: Math.max(1, Math.ceil(rect.height)),
+            });
+            if (scale <= 1) {
+                return image;
+            }
+            return image.resize({
+                width: Math.max(1, Math.ceil(rect.width * scale)),
+                height: Math.max(1, Math.ceil(rect.height * scale)),
+                quality: 'best',
+            });
+        });
+    }
+    waitForAnimationFrames(count) {
+        return __awaiter(this, void 0, void 0, function* () {
+            for (let i = 0; i < count; i++) {
+                yield new Promise((resolve) => requestAnimationFrame(() => resolve()));
+            }
+        });
+    }
     getExportBackgroundColor() {
         if (!this.mindmap) {
             return '#ffffff';
@@ -39072,18 +39159,6 @@ class MindMapView extends obsidian.TextFileView {
         return getComputedStyle(this.mindmap.containerEL)
             .getPropertyValue('--background-primary')
             .trim() || '#ffffff';
-    }
-    restoreMindmap(rootBox, left, top) {
-        if (!this.mindmap || !rootBox) {
-            return;
-        }
-        const size = this.plugin.settings.canvasSize;
-        this.mindmap.contentEL.style.width = size + 'px';
-        this.mindmap.contentEL.style.height = size + 'px';
-        this.mindmap.containerEL.scrollTop = top;
-        this.mindmap.containerEL.scrollLeft = left;
-        this.mindmap.root.setPosition(rootBox.x, rootBox.y);
-        this.mindmap.refresh();
     }
     dataURLtoBlob(dataUrl) {
         var arr = dataUrl.split(','), mime = arr[0].match(/:(.*?);/)[1], bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
@@ -39112,7 +39187,7 @@ class MindMapView extends obsidian.TextFileView {
                 //new Notice(`${t("Save success")}`);
             }
             catch (err) {
-                console.log(err);
+                console.error(err);
                 new obsidian.Notice(`${t("Save fail")}`);
             }
         }
@@ -39168,6 +39243,7 @@ class MindMapView extends obsidian.TextFileView {
         this.colors = [];
         this.timeOut = null;
         this.firstInit = true;
+        this.isInitializingMindmap = false;
         this.yamlString = '';
         this.plugin = plugin;
         this.setColors();
@@ -39212,6 +39288,7 @@ class MindMapView extends obsidian.TextFileView {
         //     }
         //   });
         // }
+        this.isInitializingMindmap = true;
         this.mindmap = new MindMap(mindData, this.contentEl, this.plugin.settings, this);
         this.mindmap.colors = this.colors;
         if (this.firstInit) {
@@ -39223,14 +39300,16 @@ class MindMapView extends obsidian.TextFileView {
                 mindmap.path = this.file.path;
                 this.fileCache = this.app.metadataCache.getFileCache(this.file);
                 this.yamlString = this.getFrontMatter();
-                mindmap.init();
-                mindmap.refresh();
-                mindmap.view = this;
-                setTimeout(() => {
+                const markReady = () => {
                     if (this.mindmap === mindmap && mindmap.appEl) {
                         mindmap.appEl.classList.add('mm-ready');
+                        this.isInitializingMindmap = false;
+                        mindmap.off('initialLayoutComplete', markReady);
                     }
-                }, 50);
+                };
+                mindmap.on('initialLayoutComplete', markReady);
+                mindmap.init();
+                mindmap.view = this;
                 // Auto-edit root node if the mindmap is completely new
                 if (mdText.trim() === "") {
                     setTimeout(() => {
@@ -39250,23 +39329,18 @@ class MindMapView extends obsidian.TextFileView {
             this.fileCache = this.app.metadataCache.getFileCache(view.file);
             this.yamlString = this.getFrontMatter();
             this.mindmap.path = view === null || view === void 0 ? void 0 : view.file.path;
-            this.mindmap.init();
-            this.mindmap.refresh();
             this.mindmap.view = this;
-            setTimeout(() => {
-                if (this.mindmap && this.mindmap.appEl) {
-                    this.mindmap.appEl.classList.add('mm-ready');
+            const mindmap = this.mindmap;
+            const markReady = () => {
+                if (this.mindmap === mindmap && mindmap.appEl) {
+                    mindmap.appEl.classList.add('mm-ready');
+                    this.isInitializingMindmap = false;
+                    mindmap.off('initialLayoutComplete', markReady);
                 }
-            }, 50);
+            };
+            mindmap.on('initialLayoutComplete', markReady);
+            mindmap.init();
         }
-    }
-    onunload() {
-        if (this.mindmap) {
-            this.mindmap.clear();
-            this.contentEl.innerHTML = '';
-            this.mindmap = null;
-        }
-        this.plugin.setMarkdownView(this.leaf);
     }
     onload() {
         super.onload();
@@ -39312,6 +39386,9 @@ class MindMapView extends obsidian.TextFileView {
     }
     updateMindMap() {
         var _a;
+        if (this.isInitializingMindmap) {
+            return;
+        }
         if (((_a = this.mindmap) === null || _a === void 0 ? void 0 : _a.root) && this.contentEl && this.contentEl.clientWidth > 0) {
             this.mindmap.refresh();
             if (obsidian.Platform.isDesktopApp) {
@@ -39659,15 +39736,21 @@ class MindMapPlugin extends obsidian.Plugin {
                 name: `${t('Toggle markdown/mindmap')}`,
                 mobileOnly: false,
                 callback: () => {
-                    const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
-                    const markdownView = this.app.workspace.getActiveViewOfType(obsidian.MarkdownView);
-                    if (mindmapView != null) {
-                        this.mindmapFileModes[mindmapView.leaf.id || mindmapView.file.path] = 'markdown';
-                        this.setMarkdownView(mindmapView.leaf);
+                    var _a, _b;
+                    const leaf = this.app.workspace.activeLeaf;
+                    const viewType = (_b = (_a = leaf === null || leaf === void 0 ? void 0 : leaf.view) === null || _a === void 0 ? void 0 : _a.getViewType) === null || _b === void 0 ? void 0 : _b.call(_a);
+                    if (!leaf || !viewType) {
+                        return;
                     }
-                    else if (markdownView != null) {
-                        this.mindmapFileModes[markdownView.leaf.id || markdownView.file.path] = mindmapViewType;
-                        this.setMarkdownView(markdownView.leaf);
+                    if (viewType === mindmapViewType) {
+                        const file = this.app.workspace.getActiveFile();
+                        this.mindmapFileModes[leaf.id || (file === null || file === void 0 ? void 0 : file.path)] = 'markdown';
+                        this.setMarkdownView(leaf);
+                    }
+                    else if (viewType === 'markdown') {
+                        const file = this.app.workspace.getActiveFile();
+                        this.mindmapFileModes[leaf.id || (file === null || file === void 0 ? void 0 : file.path)] = mindmapViewType;
+                        this.setMindMapView(leaf);
                     }
                 }
             });
@@ -39679,7 +39762,7 @@ class MindMapPlugin extends obsidian.Plugin {
                     const markdownView = this.app.workspace.getActiveViewOfType(obsidian.MarkdownView);
                     if (markdownView != null) {
                         this.mindmapFileModes[markdownView.leaf.id || markdownView.file.path] = mindmapViewType;
-                        this.setMarkdownView(markdownView.leaf);
+                        this.setMindMapView(markdownView.leaf);
                     }
                 }
             });
@@ -39793,7 +39876,6 @@ class MindMapPlugin extends obsidian.Plugin {
                             // var text = (node.data.oldText as string);
                             var text = (node.data.oldText);
                             node.setText(text);
-                            console.log(text + " / " + node.data.text);
                         }
                     }
                 }
@@ -40586,14 +40668,14 @@ class MindMapPlugin extends obsidian.Plugin {
                         var mindmap = mindmapView.mindmap;
                         var node = mindmap.selectNode;
                         if (node) {
-                            console.log("Node idx: " + node.getIndex());
-                            console.log("Previous node idx: " + node.getPreviousSibling().getIndex());
-                            console.log("Next node idx: " + node.getNextSibling().getIndex());
-                            console.log("Node pos: x=" + node.getPosition().x + " / y=" + node.getPosition().y);
-                            console.log("Node dim: x=" + node.getDimensions().x + " / y=" + node.getDimensions().y);
-                            console.log("Canvas: " + mindmap.setting.canvasSize);
-                            console.log("Disp scroll: x=" + mindmap.containerEL.scrollLeft + " / y=" + mindmap.containerEL.scrollTop);
-                            console.log("Disp client: x=" + mindmap.containerEL.clientWidth + " / y=" + mindmap.containerEL.clientHeight);
+                            console.debug("Node idx: " + node.getIndex());
+                            console.debug("Previous node idx: " + node.getPreviousSibling().getIndex());
+                            console.debug("Next node idx: " + node.getNextSibling().getIndex());
+                            console.debug("Node pos: x=" + node.getPosition().x + " / y=" + node.getPosition().y);
+                            console.debug("Node dim: x=" + node.getDimensions().x + " / y=" + node.getDimensions().y);
+                            console.debug("Canvas: " + mindmap.setting.canvasSize);
+                            console.debug("Disp scroll: x=" + mindmap.containerEL.scrollLeft + " / y=" + mindmap.containerEL.scrollTop);
+                            console.debug("Disp client: x=" + mindmap.containerEL.clientWidth + " / y=" + mindmap.containerEL.clientHeight);
                             //node.setText
                         }
                     }
@@ -40605,7 +40687,7 @@ class MindMapPlugin extends obsidian.Plugin {
                 callback: () => {
                     const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
                     if (mindmapView) {
-                        mindmapView.exportToSvg();
+                        mindmapView.exportToHtml();
                     }
                 }
             });
@@ -40676,6 +40758,7 @@ class MindMapPlugin extends obsidian.Plugin {
                 this.updateMarkdownMindMapActions();
             });
             this.addSettingTab(new MindMapSettingsTab(this.app, this));
+            this._loaded = true;
         });
     }
     ensurePagePreviewEnabled() {

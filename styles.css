@@ -67,6 +67,25 @@
   margin: 0;
 }
 
+.mm-node-content ol,
+.mm-node-content ul {
+  margin: 0;
+}
+
+.mm-node-content ul {
+  padding-inline-start: 1.2em;
+}
+
+.mm-node-content ol {
+  list-style-position: inside;
+  padding-inline-start: 0.35em;
+}
+
+.mm-node-content li > p {
+  display: inline;
+  margin: 0;
+}
+
 .mm-node.mm-root .mm-node-content {
   font-size: 1.3em;
   padding: 14px 24px;

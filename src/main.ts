@@ -48,19 +48,25 @@ export default class MindMapPlugin extends Plugin {
       }
     });
 
-     this.addCommand({
+    this.addCommand({
       id: 'Toggle to markdown or mindmap',
       name: `${t('Toggle markdown/mindmap')}`,
       mobileOnly: false,
       callback: () => {
-        const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
-        const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-        if(mindmapView!=null){
-          this.mindmapFileModes[(mindmapView.leaf as any).id || mindmapView.file.path] = 'markdown';
-          this.setMarkdownView(mindmapView.leaf);
-        }else if(markdownView!=null){
-          this.mindmapFileModes[(markdownView.leaf as any).id || markdownView.file.path] = mindmapViewType;
-          this.setMarkdownView(markdownView.leaf);
+        const leaf = this.app.workspace.activeLeaf;
+        const viewType = leaf?.view?.getViewType?.();
+        if (!leaf || !viewType) {
+          return;
+        }
+
+        if (viewType === mindmapViewType) {
+          const file = this.app.workspace.getActiveFile();
+          this.mindmapFileModes[(leaf as any).id || file?.path] = 'markdown';
+          this.setMarkdownView(leaf);
+        } else if (viewType === 'markdown') {
+          const file = this.app.workspace.getActiveFile();
+          this.mindmapFileModes[(leaf as any).id || file?.path] = mindmapViewType;
+          this.setMindMapView(leaf);
         }
       }
     });
@@ -74,7 +80,7 @@ export default class MindMapPlugin extends Plugin {
         if(markdownView!=null)
         {
           this.mindmapFileModes[(markdownView.leaf as any).id || markdownView.file.path] = mindmapViewType;
-          this.setMarkdownView(markdownView.leaf);
+          this.setMindMapView(markdownView.leaf);
         }
       }
     });
@@ -199,7 +205,6 @@ export default class MindMapPlugin extends Plugin {
               // var text = (node.data.oldText as string);
               var text = (node.data.oldText);
               node.setText(text);
-              console.log(text+" / "+node.data.text);
           }
   }
       }
@@ -1066,14 +1071,14 @@ export default class MindMapPlugin extends Plugin {
           var mindmap = mindmapView.mindmap;
           var node = mindmap.selectNode;
           if(node) {
-            console.log("Node idx: "+node.getIndex());
-            console.log("Previous node idx: "+node.getPreviousSibling().getIndex());
-            console.log("Next node idx: "+node.getNextSibling().getIndex());
-            console.log("Node pos: x="+node.getPosition().x+" / y="+node.getPosition().y);
-            console.log("Node dim: x="+node.getDimensions().x+" / y="+node.getDimensions().y);
-            console.log("Canvas: "+mindmap.setting.canvasSize);
-            console.log("Disp scroll: x="+mindmap.containerEL.scrollLeft+" / y="+mindmap.containerEL.scrollTop);
-            console.log("Disp client: x="+mindmap.containerEL.clientWidth+" / y="+mindmap.containerEL.clientHeight);
+            console.debug("Node idx: "+node.getIndex());
+            console.debug("Previous node idx: "+node.getPreviousSibling().getIndex());
+            console.debug("Next node idx: "+node.getNextSibling().getIndex());
+            console.debug("Node pos: x="+node.getPosition().x+" / y="+node.getPosition().y);
+            console.debug("Node dim: x="+node.getDimensions().x+" / y="+node.getDimensions().y);
+            console.debug("Canvas: "+mindmap.setting.canvasSize);
+            console.debug("Disp scroll: x="+mindmap.containerEL.scrollLeft+" / y="+mindmap.containerEL.scrollTop);
+            console.debug("Disp client: x="+mindmap.containerEL.clientWidth+" / y="+mindmap.containerEL.clientHeight);
             //node.setText
           }
         }
@@ -1088,7 +1093,7 @@ export default class MindMapPlugin extends Plugin {
       callback: () => {
         const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
         if(mindmapView){
-            mindmapView.exportToSvg();
+            mindmapView.exportToHtml();
         }
       }
     });
@@ -1172,6 +1177,7 @@ export default class MindMapPlugin extends Plugin {
 
 
     this.addSettingTab(new MindMapSettingsTab(this.app, this));
+    this._loaded = true;
 
   }
 

@@ -35,6 +35,7 @@ export class MindMapView extends TextFileView implements HoverParent {
   timeOut: any = null;
   fileCache: any;
   firstInit: boolean = true;
+  isInitializingMindmap: boolean = false;
   yamlString:string=''
 
   getViewType() {
@@ -56,7 +57,7 @@ export class MindMapView extends TextFileView implements HoverParent {
          colors = this.plugin.settings.strokeArray;
       }
     }catch(err){
-       console.log(err,'stroke array is error');
+       console.error('stroke array is error', err);
     }
 
     this.colors = this.colors.concat(colors);
@@ -64,67 +65,48 @@ export class MindMapView extends TextFileView implements HoverParent {
     // We no longer add 50 random colors. Layout.ts now uses CSS variable defined theme palettes.
   }
 
-  exportToSvg(){
-    if(!this.mindmap){
+  async exportToHtml() {
+    if (!this.mindmap) {
       return;
     }
 
-   // this.mindmap.contentEL.style.visibility='hidden';
-    var nodes:any[] = [];
-    this.mindmap.traverseDF((n:any)=>{
-       if(n.isShow()){
-         nodes.push(n)
-       }
-    });
+    let exportEl: HTMLElement | null = null;
 
+    try {
+      const snapshot = this.createExportSnapshot(this.canUseElectronCapture());
+      exportEl = snapshot.element;
+      const dataUrl = await this.exportSnapshotToDataUrl(snapshot, 'png', 1);
+      const fileName = this.mindmap.path.replace(/\.md$/, '.html');
+      const title = this.file?.basename || 'MindMark Export';
+      const html = [
+        '<!DOCTYPE html>',
+        '<html lang="en">',
+        '<head>',
+        '  <meta charset="UTF-8">',
+        `  <title>${title}</title>`,
+        '  <meta name="viewport" content="width=device-width, initial-scale=1.0">',
+        '  <style>',
+        '    body { margin: 0; padding: 24px; background: #f5f5f5; font-family: sans-serif; }',
+        '    main { display: flex; justify-content: center; }',
+        '    img { max-width: 100%; height: auto; display: block; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12); }',
+        '  </style>',
+        '</head>',
+        '<body>',
+        '  <main>',
+        `    <img src="${dataUrl}" alt="${title}">`,
+        '  </main>',
+        '</body>',
+        '</html>',
+      ].join('\n');
 
-
-    var oldScrollLeft = this.mindmap.containerEL.scrollLeft;
-    var oldScrollTop = this.mindmap.containerEL.scrollTop;
-
-    var box  = this.mindmap.getBoundingRect(nodes);
-    var rootBox = this.mindmap.root.getPosition();
-
-    var disX =0,disY=0;
-    if(box.x>60){
-      disX = box.x - 60;
+      await this.app.vault.adapter.write(fileName, html);
+      new Notice(`Mindmap exported as HTML: ${fileName}`);
+    } catch (err) {
+      console.error('Failed to export mindmap as HTML:', err);
+      new Notice(`Failed to export mindmap as HTML: ${err}`);
+    } finally {
+      exportEl?.remove();
     }
-
-    if(box.y>60){
-       disY = box.y - 60;
-    }
-
-    this.mindmap.root.setPosition(rootBox.x-disX,rootBox.y-disY);
-    this.mindmap.refresh();
-
-    var w = box.width + 120;
-    var h = box.height + 120;
-
-    this.mindmap.contentEL.style.width=w+'px';
-    this.mindmap.contentEL.style.height=h+'px';
-
-    setTimeout(()=>{
-      domtoimage.toPng(this.mindmap.contentEL,{}).then(dataUrl=>{
-        var img = new Image()
-        img.src = dataUrl;
-        var str = img.outerHTML;
-
-        const fileName = this.mindmap.path.replace(/\.md$/, '.html');
-        try{
-          new Notice(`Mindmap exported as HTML: ${fileName}`);
-          this.app.vault.adapter.write(fileName, str);
-          this.restoreMindmap(rootBox,oldScrollLeft,oldScrollTop)
-        }catch(err){
-          this.restoreMindmap(rootBox,oldScrollLeft,oldScrollTop)
-          new Notice(`Failed to export mindmap: ${err}`);
-        }
-
-      }).catch(err=>{
-        this.restoreMindmap(rootBox,oldScrollLeft,oldScrollTop)
-        new Notice(err);
-      })
-    },200);
-
   }
 
   exportToPng(i_scale: number) {
@@ -152,23 +134,11 @@ export class MindMapView extends TextFileView implements HoverParent {
     const extension = format === 'png' ? '.png' : '.jpeg';
 
     try {
-      const snapshot = this.createExportSnapshot();
+      const snapshot = this.createExportSnapshot(this.canUseElectronCapture());
       exportEl = snapshot.element;
-      const options = {
-        width: snapshot.width,
-        height: snapshot.height,
-        scale: Math.max(1, scale),
-        bgcolor: format === 'jpeg'
-          ? this.getExportBackgroundColor()
-          : undefined,
-      };
-      const dataUrl = format === 'png'
-        ? await domtoimage.toPng(exportEl, options)
-        : await domtoimage.toJpeg(exportEl, { ...options, quality: 1.0 });
+      const binary = await this.exportSnapshotToBinary(snapshot, format, Math.max(1, scale));
       const fileName = this.mindmap.path.replace(/\.md$/, extension);
-      const arrayBuffer = await this.dataURLtoBlob(dataUrl).arrayBuffer();
-
-      await this.app.vault.adapter.writeBinary(fileName, arrayBuffer);
+      await this.app.vault.adapter.writeBinary(fileName, binary);
       new Notice(`Mindmap exported as ${format.toUpperCase()}: ${fileName}`);
     } catch (err) {
       console.error(`Failed to export mindmap as ${format.toUpperCase()}:`, err);
@@ -178,7 +148,7 @@ export class MindMapView extends TextFileView implements HoverParent {
     }
   }
 
-  private createExportSnapshot() {
+  private createExportSnapshot(visibleForCapture: boolean) {
     if (!this.mindmap) {
       throw new Error('Mindmap is not available');
     }
@@ -203,14 +173,15 @@ export class MindMapView extends TextFileView implements HoverParent {
 
     const wrapper = document.createElement('div');
     wrapper.className = 'mindmark-export-snapshot';
-    wrapper.style.position = 'fixed';
-    wrapper.style.left = '-100000px';
+    wrapper.style.position = visibleForCapture ? 'absolute' : 'fixed';
+    wrapper.style.left = visibleForCapture ? '0' : '-100000px';
     wrapper.style.top = '0';
     wrapper.style.width = `${width}px`;
     wrapper.style.height = `${height}px`;
     wrapper.style.overflow = 'hidden';
     wrapper.style.pointerEvents = 'none';
     wrapper.style.background = this.getExportBackgroundColor();
+    wrapper.style.zIndex = '2147483647';
 
     const contentClone = this.mindmap.contentEL.cloneNode(true) as HTMLElement;
     contentClone.style.position = 'absolute';
@@ -230,6 +201,97 @@ export class MindMapView extends TextFileView implements HoverParent {
     return { element: wrapper, width, height };
   }
 
+  private canUseElectronCapture(): boolean {
+    if (!Platform.isDesktopApp) {
+      return false;
+    }
+
+    try {
+      const electron = require('electron');
+      return Boolean(electron?.remote?.getCurrentWindow);
+    } catch (err) {
+      return false;
+    }
+  }
+
+  private async exportSnapshotToDataUrl(
+    snapshot: { element: HTMLElement; width: number; height: number },
+    format: 'png' | 'jpeg',
+    scale: number,
+  ): Promise<string> {
+    if (this.canUseElectronCapture()) {
+      return this.captureSnapshotWithElectron(snapshot, format, scale).then((image) => {
+        return format === 'jpeg'
+          ? `data:image/jpeg;base64,${image.toJPEG(100).toString('base64')}`
+          : image.toDataURL();
+      });
+    }
+
+    const options = {
+      width: snapshot.width,
+      height: snapshot.height,
+      scale,
+      bgcolor: format === 'jpeg'
+        ? this.getExportBackgroundColor()
+        : undefined,
+    };
+    return format === 'png'
+      ? domtoimage.toPng(snapshot.element, options)
+      : domtoimage.toJpeg(snapshot.element, { ...options, quality: 1.0 });
+  }
+
+  private async exportSnapshotToBinary(
+    snapshot: { element: HTMLElement; width: number; height: number },
+    format: 'png' | 'jpeg',
+    scale: number,
+  ): Promise<ArrayBuffer> {
+    if (this.canUseElectronCapture()) {
+      const image = await this.captureSnapshotWithElectron(snapshot, format, scale);
+      const buffer = format === 'jpeg'
+        ? image.toJPEG(100)
+        : image.toPNG();
+      return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+    }
+
+    const dataUrl = await this.exportSnapshotToDataUrl(snapshot, format, scale);
+    return this.dataURLtoBlob(dataUrl).arrayBuffer();
+  }
+
+  private async captureSnapshotWithElectron(
+    snapshot: { element: HTMLElement; width: number; height: number },
+    format: 'png' | 'jpeg',
+    scale: number,
+  ) {
+    const electron = require('electron');
+    const currentWindow = electron.remote.getCurrentWindow();
+
+    await this.waitForAnimationFrames(2);
+
+    const rect = snapshot.element.getBoundingClientRect();
+    const image = await currentWindow.webContents.capturePage({
+      x: Math.max(0, Math.floor(rect.left)),
+      y: Math.max(0, Math.floor(rect.top)),
+      width: Math.max(1, Math.ceil(rect.width)),
+      height: Math.max(1, Math.ceil(rect.height)),
+    });
+
+    if (scale <= 1) {
+      return image;
+    }
+
+    return image.resize({
+      width: Math.max(1, Math.ceil(rect.width * scale)),
+      height: Math.max(1, Math.ceil(rect.height * scale)),
+      quality: 'best',
+    });
+  }
+
+  private async waitForAnimationFrames(count: number) {
+    for (let i = 0; i < count; i++) {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    }
+  }
+
   private getExportBackgroundColor() {
     if (!this.mindmap) {
       return '#ffffff';
@@ -243,20 +305,6 @@ export class MindMapView extends TextFileView implements HoverParent {
     return getComputedStyle(this.mindmap.containerEL)
       .getPropertyValue('--background-primary')
       .trim() || '#ffffff';
-  }
-
-  private restoreMindmap(rootBox: any, left: number, top: number) {
-    if (!this.mindmap || !rootBox) {
-      return;
-    }
-
-    const size = this.plugin.settings.canvasSize;
-    this.mindmap.contentEL.style.width = size + 'px';
-    this.mindmap.contentEL.style.height = size + 'px';
-    this.mindmap.containerEL.scrollTop = top;
-    this.mindmap.containerEL.scrollLeft = left;
-    this.mindmap.root.setPosition(rootBox.x, rootBox.y);
-    this.mindmap.refresh();
   }
 
   dataURLtoBlob(dataUrl: string) {
@@ -287,7 +335,7 @@ export class MindMapView extends TextFileView implements HoverParent {
         this.requestSave();
         //new Notice(`${t("Save success")}`);
        }catch(err){
-        console.log(err);
+        console.error(err);
         new Notice(`${t("Save fail")}`)
       }
     }
@@ -403,6 +451,7 @@ export class MindMapView extends TextFileView implements HoverParent {
     //   });
     // }
 
+    this.isInitializingMindmap = true;
     this.mindmap = new MindMap(mindData, this.contentEl, this.plugin.settings, this);
     this.mindmap.colors = this.colors;
     if (this.firstInit) {
@@ -416,14 +465,17 @@ export class MindMapView extends TextFileView implements HoverParent {
         mindmap.path = this.file.path;
         this.fileCache = this.app.metadataCache.getFileCache(this.file);
         this.yamlString = this.getFrontMatter();
-        mindmap.init();
-        mindmap.refresh();
-        mindmap.view = this;
-        setTimeout(() => {
+        const markReady = () => {
           if (this.mindmap === mindmap && mindmap.appEl) {
             mindmap.appEl.classList.add('mm-ready');
+            this.isInitializingMindmap = false;
+            mindmap.off('initialLayoutComplete', markReady);
           }
-        }, 50);
+        };
+
+        mindmap.on('initialLayoutComplete', markReady);
+        mindmap.init();
+        mindmap.view = this;
         
         // Auto-edit root node if the mindmap is completely new
         if (mdText.trim() === "") {
@@ -445,28 +497,19 @@ export class MindMapView extends TextFileView implements HoverParent {
       this.yamlString = this.getFrontMatter();
 
       this.mindmap.path = view?.file.path;
-      this.mindmap.init();
-      this.mindmap.refresh();
       this.mindmap.view = this;
-      setTimeout(() => {
-        if (this.mindmap && this.mindmap.appEl) {
-          this.mindmap.appEl.classList.add('mm-ready');
+      const mindmap = this.mindmap;
+      const markReady = () => {
+        if (this.mindmap === mindmap && mindmap.appEl) {
+          mindmap.appEl.classList.add('mm-ready');
+          this.isInitializingMindmap = false;
+          mindmap.off('initialLayoutComplete', markReady);
         }
-      }, 50);
+      };
+
+      mindmap.on('initialLayoutComplete', markReady);
+      mindmap.init();
     }
-  }
-
-  onunload() {
-
-    if (this.mindmap) {
-      this.mindmap.clear();
-      this.contentEl.innerHTML = '';
-      this.mindmap = null;
-    }
-
-    this.plugin.setMarkdownView(this.leaf);
-
-
   }
 
   onload() {
@@ -520,6 +563,10 @@ export class MindMapView extends TextFileView implements HoverParent {
   }
 
   updateMindMap() {
+    if (this.isInitializingMindmap) {
+      return;
+    }
+
     if (this.mindmap?.root && this.contentEl && this.contentEl.clientWidth > 0) {
       this.mindmap.refresh();
       if(Platform.isDesktopApp){

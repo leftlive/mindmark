@@ -43,6 +43,11 @@ export class FileSuggest {
         this.containerEl.style.display = 'none';
     }
 
+    destroy() {
+        this.close();
+        this.containerEl.remove();
+    }
+
     updateSuggestions() {
         const allFiles = this.app.vault.getMarkdownFiles();
         if (!this.activeQuery) {
@@ -122,20 +127,17 @@ export class FileSuggest {
             
             const matchIndex = textBeforeCursor.lastIndexOf('[[');
             if (matchIndex !== -1) {
-                // Delete everything from [[ to the cursor
-                const charsToDelete = textBeforeCursor.length - matchIndex;
-                
-                // Expand range backwards to delete the [[ and query
-                let currentPos = range.endOffset;
-                let container = range.endContainer;
-                
-                // A simpler approach for contentEditable:
-                // Just replace the text content, since we don't have complex HTML inside during edit mode (it's plain text).
-                const newText = text.substring(0, matchIndex) + `[[${file.basename}]]` + text.substring(textBeforeCursor.length);
+                const hasDuplicateBasename = this.app.vault.getMarkdownFiles().some((candidate) => {
+                    return candidate.path !== file.path && candidate.basename === file.basename;
+                });
+                const linkTarget = hasDuplicateBasename
+                    ? file.path.replace(/\.md$/, '')
+                    : file.basename;
+                const newText = text.substring(0, matchIndex) + `[[${linkTarget}]]` + text.substring(textBeforeCursor.length);
                 contentEl.innerText = newText;
                 
                 // Set cursor to end of the inserted link
-                const newCursorPos = matchIndex + `[[${file.basename}]]`.length;
+                const newCursorPos = matchIndex + `[[${linkTarget}]]`.length;
                 const newRange = document.createRange();
                 
                 // Because innerText might create new text nodes or single text node

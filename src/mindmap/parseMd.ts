@@ -1,3 +1,3 @@
 export default function parseMd(text:string){
-   return text;
+   return text.replace(/\r\n/g, '\n').trim();
 }
