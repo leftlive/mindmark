@@ -1219,6 +1219,10 @@ export default class MindMapPlugin extends Plugin {
   }
 
   async setMarkdownView(leaf: WorkspaceLeaf) {
+    if (leaf.view instanceof MindMapView) {
+      await leaf.view.formatAndSaveMarkdown();
+    }
+
     await leaf.setViewState(
       {
         type: "markdown",

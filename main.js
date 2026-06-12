@@ -1172,7 +1172,7 @@ class Layout {
         this.mind = mind || (node === null || node === void 0 ? void 0 : node.mindmap) || null;
         this.direct = direct || 'mindmap';
         this.colors = colors || [];
-        if (!((_a = this.mind) === null || _a === void 0 ? void 0 : _a.edgeGroup)) {
+        if (!this.root || !((_a = this.mind) === null || _a === void 0 ? void 0 : _a.edgeGroup)) {
             return;
         }
         if (!this.svgDom)
@@ -9834,6 +9834,9 @@ class MindMap {
     }
     //layout
     layout() {
+        if (!this.root) {
+            return;
+        }
         var activeRoot = this.focusedNode || this.root;
         // Ensure all nodes are display: block to maintain layout space
         // and remove any previously added dimmed classes
@@ -10063,7 +10066,10 @@ class MindMap {
     }
     getMarkdown() {
         var md = '';
-        var level = this.setting.headLevel;
+        var configuredLevel = Number(this.setting.headLevel);
+        var level = Number.isFinite(configuredLevel)
+            ? Math.max(0, Math.min(6, Math.trunc(configuredLevel)))
+            : 1;
         this.traverseDF((n) => {
             var l = n.getLevel() + 1;
             var hPrefix = '', space = '';
@@ -10071,7 +10077,7 @@ class MindMap {
                 hPrefix = '\n';
             }
             const ending = n.isExpand ? '' : ` ^${n.getId()}`;
-            let actualLevel = Math.min(level, 6);
+            let actualLevel = level;
             if (n.getLevel() < actualLevel) {
                 for (let i = 0; i < l; i++) {
                     hPrefix += '#';
@@ -38983,8 +38989,7 @@ class MindMapView extends obsidian.TextFileView {
         return new Blob([u8arr], { type: mime });
     }
     mindMapChange() {
-        if (this.mindmap) {
-            var md = this.mindmap.getMarkdown();
+        if (this.serializeMindMap()) {
             //  var matchArray: string[] = []
             // var collapsedIds: string[] = []
             // const idRegexMultiline = /.+ \^([a-z0-9\-]+)$/gim
@@ -38996,7 +39001,6 @@ class MindMapView extends obsidian.TextFileView {
             //   this.fileCache.frontmatter.collapsedIds = collapsedIds;
             // }
             //var frontMatter = this.getFrontMatter();
-            this.data = this.yamlString + md;
             // console.log(this.mindmap.path);
             // this.app.vault.adapter.write(this.mindmap.path, this.data);
             try {
@@ -39008,6 +39012,25 @@ class MindMapView extends obsidian.TextFileView {
                 new obsidian.Notice(`${t("Save fail")}`);
             }
         }
+    }
+    serializeMindMap() {
+        if (!this.mindmap) {
+            return false;
+        }
+        const configuredHeadLevel = Number(this.plugin.settings.headLevel);
+        this.mindmap.setting.headLevel = Number.isFinite(configuredHeadLevel)
+            ? Math.max(0, Math.min(6, Math.trunc(configuredHeadLevel)))
+            : 1;
+        this.data = this.yamlString + this.mindmap.getMarkdown();
+        return true;
+    }
+    formatAndSaveMarkdown() {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (!this.serializeMindMap()) {
+                return;
+            }
+            yield this.save(false);
+        });
     }
     getFrontMatter() {
         var frontMatter = '---\n\n';
@@ -39142,12 +39165,12 @@ class MindMapView extends obsidian.TextFileView {
             }
         }));
         // 增加切换回 Markdown 的快捷按钮
-        this.addAction("document", t("Open as markdown"), () => {
+        this.addAction("document", t("Open as markdown"), () => __awaiter(this, void 0, void 0, function* () {
             this.plugin.mindmapFileModes[this.id || this.file.path] = "markdown";
-            this.plugin.setMarkdownView(this.leaf);
-        });
+            yield this.plugin.setMarkdownView(this.leaf);
+        }));
         // 增加向右分屏并以 Markdown 展示的快捷按钮 (Toggle 模式)
-        this.addAction("sidebar-right", "Toggle split right (Markdown)", () => {
+        this.addAction("sidebar-right", "Toggle split right (Markdown)", () => __awaiter(this, void 0, void 0, function* () {
             // 查找当前工作区中是否已经有显示该文件的 markdown 视图
             const leaves = this.app.workspace.getLeavesOfType("markdown");
             const existingLeaf = leaves.find(l => {
@@ -39159,6 +39182,7 @@ class MindMapView extends obsidian.TextFileView {
                 existingLeaf.detach();
             }
             else {
+                yield this.formatAndSaveMarkdown();
                 // 否则，创建一个新的右侧分屏叶子
                 const newLeaf = this.app.workspace.getLeaf("split", "vertical");
                 // 标记这个新叶子需要以 Markdown 模式打开，避免被插件再次拦截为导图
@@ -39166,7 +39190,7 @@ class MindMapView extends obsidian.TextFileView {
                 // 在新叶子中打开当前文件
                 newLeaf.openFile(this.file, { active: true });
             }
-        });
+        }));
     }
     onQuickPreview(file, data) {
         if (file === this.file && data !== this.data) {
@@ -39175,7 +39199,8 @@ class MindMapView extends obsidian.TextFileView {
         }
     }
     updateMindMap() {
-        if (this.mindmap && this.contentEl && this.contentEl.clientWidth > 0) {
+        var _a;
+        if (((_a = this.mindmap) === null || _a === void 0 ? void 0 : _a.root) && this.contentEl && this.contentEl.clientWidth > 0) {
             this.mindmap.refresh();
             if (obsidian.Platform.isDesktopApp) {
                 this.mindmap.center();
@@ -39243,10 +39268,10 @@ class MindMapView extends obsidian.TextFileView {
             item
                 .setTitle(`${t("Open as markdown")}`)
                 .setIcon("document")
-                .onClick(() => {
+                .onClick(() => __awaiter(this, void 0, void 0, function* () {
                 this.plugin.mindmapFileModes[this.id || this.file.path] = "markdown";
-                this.plugin.setMarkdownView(this.leaf);
-            });
+                yield this.plugin.setMarkdownView(this.leaf);
+            }));
         });
         // .addItem((item)=>{
         //    item
@@ -40517,6 +40542,9 @@ class MindMapPlugin extends obsidian.Plugin {
     }
     setMarkdownView(leaf) {
         return __awaiter(this, void 0, void 0, function* () {
+            if (leaf.view instanceof MindMapView) {
+                yield leaf.view.formatAndSaveMarkdown();
+            }
             yield leaf.setViewState({
                 type: "markdown",
                 state: leaf.view.getState(),

@@ -22,7 +22,7 @@ export default class Layout {
        this.direct = direct||'mindmap';
        this.colors=colors||[];
       
-       if (!this.mind?.edgeGroup) {
+       if (!this.root || !this.mind?.edgeGroup) {
            return;
        }
        if (!this.svgDom) this.svgDom = this.mind.edgeGroup.group();

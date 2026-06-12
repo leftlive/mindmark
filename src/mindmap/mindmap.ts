@@ -2200,6 +2200,10 @@ export default class MindMap {
 
     //layout
     layout() {
+        if (!this.root) {
+            return;
+        }
+
         var activeRoot = this.focusedNode || this.root;
 
         // Ensure all nodes are display: block to maintain layout space
@@ -2495,7 +2499,10 @@ export default class MindMap {
 
     getMarkdown() {
         var md = '';
-        var level = this.setting.headLevel;
+        var configuredLevel = Number(this.setting.headLevel);
+        var level = Number.isFinite(configuredLevel)
+            ? Math.max(0, Math.min(6, Math.trunc(configuredLevel)))
+            : 1;
         this.traverseDF((n: INode) => {
             var l = n.getLevel() + 1;
             var hPrefix = '', space = '';
@@ -2504,7 +2511,7 @@ export default class MindMap {
             }
             const ending = n.isExpand ? '' : ` ^${n.getId()}`
             
-            let actualLevel = Math.min(level, 6);
+            let actualLevel = level;
             if (n.getLevel() < actualLevel) {
                 for (let i = 0; i < l; i++) {
                     hPrefix += '#';

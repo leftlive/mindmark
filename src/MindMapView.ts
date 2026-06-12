@@ -254,8 +254,7 @@ export class MindMapView extends TextFileView implements HoverParent {
   }
 
   mindMapChange() {
-    if (this.mindmap) {
-      var md = this.mindmap.getMarkdown();
+    if (this.serializeMindMap()) {
     //  var matchArray: string[] = []
       // var collapsedIds: string[] = []
       // const idRegexMultiline = /.+ \^([a-z0-9\-]+)$/gim
@@ -267,7 +266,6 @@ export class MindMapView extends TextFileView implements HoverParent {
       //   this.fileCache.frontmatter.collapsedIds = collapsedIds;
       // }
       //var frontMatter = this.getFrontMatter();
-      this.data = this.yamlString + md;
       // console.log(this.mindmap.path);
      // this.app.vault.adapter.write(this.mindmap.path, this.data);
        try{
@@ -278,6 +276,28 @@ export class MindMapView extends TextFileView implements HoverParent {
         new Notice(`${t("Save fail")}`)
       }
     }
+  }
+
+  private serializeMindMap(): boolean {
+    if (!this.mindmap) {
+      return false;
+    }
+
+    const configuredHeadLevel = Number(this.plugin.settings.headLevel);
+    this.mindmap.setting.headLevel = Number.isFinite(configuredHeadLevel)
+      ? Math.max(0, Math.min(6, Math.trunc(configuredHeadLevel)))
+      : 1;
+
+    this.data = this.yamlString + this.mindmap.getMarkdown();
+    return true;
+  }
+
+  async formatAndSaveMarkdown(): Promise<void> {
+    if (!this.serializeMindMap()) {
+      return;
+    }
+
+    await this.save(false);
   }
 
   getFrontMatter() {
@@ -440,13 +460,13 @@ export class MindMapView extends TextFileView implements HoverParent {
     );
 
     // 增加切换回 Markdown 的快捷按钮
-    this.addAction("document", t("Open as markdown"), () => {
+    this.addAction("document", t("Open as markdown"), async () => {
       this.plugin.mindmapFileModes[this.id || this.file.path] = "markdown";
-      this.plugin.setMarkdownView(this.leaf);
+      await this.plugin.setMarkdownView(this.leaf);
     });
 
     // 增加向右分屏并以 Markdown 展示的快捷按钮 (Toggle 模式)
-    this.addAction("sidebar-right", "Toggle split right (Markdown)", () => {
+    this.addAction("sidebar-right", "Toggle split right (Markdown)", async () => {
       // 查找当前工作区中是否已经有显示该文件的 markdown 视图
       const leaves = this.app.workspace.getLeavesOfType("markdown");
       const existingLeaf = leaves.find(l => {
@@ -458,6 +478,7 @@ export class MindMapView extends TextFileView implements HoverParent {
         // 如果已经存在，则将其关闭（取消分屏）
         existingLeaf.detach();
       } else {
+        await this.formatAndSaveMarkdown();
         // 否则，创建一个新的右侧分屏叶子
         const newLeaf = (this.app.workspace as any).getLeaf("split", "vertical") as WorkspaceLeaf;
         // 标记这个新叶子需要以 Markdown 模式打开，避免被插件再次拦截为导图
@@ -476,7 +497,7 @@ export class MindMapView extends TextFileView implements HoverParent {
   }
 
   updateMindMap() {
-    if (this.mindmap && this.contentEl && this.contentEl.clientWidth > 0) {
+    if (this.mindmap?.root && this.contentEl && this.contentEl.clientWidth > 0) {
       this.mindmap.refresh();
       if(Platform.isDesktopApp){
         this.mindmap.center();
@@ -551,9 +572,9 @@ export class MindMapView extends TextFileView implements HoverParent {
         item
           .setTitle(`${t("Open as markdown")}`)
           .setIcon("document")
-          .onClick(() => {
+          .onClick(async () => {
             this.plugin.mindmapFileModes[this.id || this.file.path] = "markdown";
-            this.plugin.setMarkdownView(this.leaf);
+            await this.plugin.setMarkdownView(this.leaf);
           });
       });
 
