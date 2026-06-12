@@ -33,6 +33,13 @@ export default {
 
     "Stroke Array":"Stroke array",
     "Stroke Array Desc":"Node link color base on this value or random color",
+    "Enable internal link preview":"Enable internal link preview",
+    "Enable internal link preview desc":"Show a note preview when hovering over an internal link in a mindmap node",
+    "Internal link open mode":"Internal link open mode",
+    "Internal link open mode desc":"Choose where internal links open when clicked in a mindmap node",
+    "Current tab":"Current tab",
+    "New tab":"New tab",
+    "New window":"New window",
     "Save fail":"Save data err",
     "Save success":"Save data success",
     "Toggle markdown/mindmap":"Toggle to markdown/mindmap mode",

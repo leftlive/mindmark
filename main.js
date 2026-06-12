@@ -140,6 +140,13 @@ var en = {
     "Clockwise": "Clockwise",
     "Stroke Array": "Stroke array",
     "Stroke Array Desc": "Node link color base on this value or random color",
+    "Enable internal link preview": "Enable internal link preview",
+    "Enable internal link preview desc": "Show a note preview when hovering over an internal link in a mindmap node",
+    "Internal link open mode": "Internal link open mode",
+    "Internal link open mode desc": "Choose where internal links open when clicked in a mindmap node",
+    "Current tab": "Current tab",
+    "New tab": "New tab",
+    "New window": "New window",
     "Save fail": "Save data err",
     "Save success": "Save data success",
     "Toggle markdown/mindmap": "Toggle to markdown/mindmap mode",
@@ -354,6 +361,13 @@ var zhCN = {
     "Add brother node": "添加兄弟节点",
     "Stroke Array": "颜色组",
     "Stroke Array Desc": "节点连线颜色将按照颜色组生成,否则生成随机颜色",
+    "Enable internal link preview": "启用双链预览",
+    "Enable internal link preview desc": "鼠标悬停在思维导图节点中的双链上时显示笔记预览",
+    "Internal link open mode": "双链点击打开方式",
+    "Internal link open mode desc": "选择点击思维导图节点中的双链后打开笔记的位置",
+    "Current tab": "当前标签页",
+    "New tab": "新标签页",
+    "New window": "新窗口",
     "Save fail": "保存失败",
     "Save success": "保存成功",
     "Toggle markdown/mindmap": "切换为 markdown 或 mindmap 模式",
@@ -9248,7 +9262,8 @@ class MindMap {
                 evt.stopPropagation();
                 var href = internalLink.getAttribute("data-href") || internalLink.getAttribute("href");
                 if (href) {
-                    this.view.app.workspace.openLinkText(href, this.view.file.path, "window");
+                    const openMode = this.view.plugin.settings.linkOpenMode;
+                    this.view.app.workspace.openLinkText(href, this.view.file.path, openMode === "current" ? false : openMode);
                 }
                 return;
             }
@@ -9513,10 +9528,13 @@ class MindMap {
         this._menuDom.style.display = 'none';
     }
     appMouseOverFn(evt) {
-        var _a, _b;
+        var _a, _b, _c;
+        if (!((_a = this.view) === null || _a === void 0 ? void 0 : _a.plugin.settings.enableLinkPreview)) {
+            return;
+        }
         const targetEl = evt.target;
         const linkEl = targetEl.closest("a.internal-link");
-        const sourcePath = (_b = (_a = this.view) === null || _a === void 0 ? void 0 : _a.file) === null || _b === void 0 ? void 0 : _b.path;
+        const sourcePath = (_c = (_b = this.view) === null || _b === void 0 ? void 0 : _b.file) === null || _c === void 0 ? void 0 : _c.path;
         if (linkEl && sourcePath) {
             const linktext = linkEl.getAttribute("data-href") || linkEl.getAttribute("href") || linkEl.innerText;
             if (!linktext) {
@@ -39420,6 +39438,30 @@ class MindMapSettingsTab extends obsidian.PluginSettingTab {
             this.plugin.settings.focusOnMove = value;
             this.plugin.saveData(this.plugin.settings);
         }));
+        new obsidian.Setting(containerEl)
+            .setName(t('Enable internal link preview'))
+            .setDesc(t('Enable internal link preview desc'))
+            .addToggle((toggle) => toggle
+            .setValue(this.plugin.settings.enableLinkPreview)
+            .onChange((value) => __awaiter(this, void 0, void 0, function* () {
+            this.plugin.settings.enableLinkPreview = value;
+            yield this.plugin.saveSettings();
+            if (value) {
+                yield this.plugin.ensurePagePreviewEnabled();
+            }
+        })));
+        new obsidian.Setting(containerEl)
+            .setName(t('Internal link open mode'))
+            .setDesc(t('Internal link open mode desc'))
+            .addDropdown((dropdown) => dropdown
+            .addOption('current', t('Current tab'))
+            .addOption('tab', t('New tab'))
+            .addOption('window', t('New window'))
+            .setValue(this.plugin.settings.linkOpenMode)
+            .onChange((value) => __awaiter(this, void 0, void 0, function* () {
+            this.plugin.settings.linkOpenMode = value;
+            yield this.plugin.saveSettings();
+        })));
     }
 }
 
@@ -40476,6 +40518,9 @@ class MindMapPlugin extends obsidian.Plugin {
     ensurePagePreviewEnabled() {
         var _a;
         return __awaiter(this, void 0, void 0, function* () {
+            if (!this.settings.enableLinkPreview) {
+                return;
+            }
             const internalPlugins = this.app.internalPlugins;
             const pagePreview = (_a = internalPlugins === null || internalPlugins === void 0 ? void 0 : internalPlugins.getPluginById) === null || _a === void 0 ? void 0 : _a.call(internalPlugins, "page-preview");
             if (pagePreview && !pagePreview.enabled) {
@@ -40518,7 +40563,9 @@ class MindMapPlugin extends obsidian.Plugin {
                 fontSize: 16,
                 background: 'transparent',
                 layout: 'mindmap',
-                layoutDirect: 'mindmap'
+                layoutDirect: 'mindmap',
+                enableLinkPreview: true,
+                linkOpenMode: 'window'
             }, yield this.loadData());
         });
     }

@@ -43,6 +43,13 @@ export default {
 
   "Stroke Array":"颜色组",
   "Stroke Array Desc":"节点连线颜色将按照颜色组生成,否则生成随机颜色",
+  "Enable internal link preview":"启用双链预览",
+  "Enable internal link preview desc":"鼠标悬停在思维导图节点中的双链上时显示笔记预览",
+  "Internal link open mode":"双链点击打开方式",
+  "Internal link open mode desc":"选择点击思维导图节点中的双链后打开笔记的位置",
+  "Current tab":"当前标签页",
+  "New tab":"新标签页",
+  "New window":"新窗口",
   "Save fail":"保存失败",
   "Save success":"保存成功",
   "Toggle markdown/mindmap":"切换为 markdown 或 mindmap 模式",

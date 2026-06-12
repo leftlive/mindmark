@@ -83,6 +83,13 @@ Keyboard behavior in the mind map view includes:
 - `Cmd/Ctrl + Z`: undo
 - `Cmd/Ctrl + Y`: redo
 
+## Internal Link Settings
+
+MindMark provides two settings for Obsidian internal links rendered inside nodes:
+
+- **Enable internal link preview**: show the target note preview on hover. Enabled by default.
+- **Internal link open mode**: open links in the current tab, a new tab, or a new window. New window is the default.
+
 ## Project Structure
 
 ```text

@@ -1171,7 +1171,11 @@ export default class MindMapPlugin extends Plugin {
 
   }
 
-  private async ensurePagePreviewEnabled() {
+  async ensurePagePreviewEnabled() {
+    if (!this.settings.enableLinkPreview) {
+      return;
+    }
+
     const internalPlugins = (this.app as any).internalPlugins;
     const pagePreview = internalPlugins?.getPluginById?.("page-preview");
 
@@ -1220,7 +1224,9 @@ export default class MindMapPlugin extends Plugin {
       fontSize: 16,
       background: 'transparent',
       layout: 'mindmap',
-      layoutDirect: 'mindmap'
+      layoutDirect: 'mindmap',
+      enableLinkPreview: true,
+      linkOpenMode: 'window'
     }, await this.loadData());
   }
 

@@ -27,7 +27,9 @@ interface Setting {
     headLevel: number,
     layoutDirect: string,
     strokeArray?:any[],
-    focusOnMove?: boolean
+    focusOnMove?: boolean,
+    enableLinkPreview?: boolean,
+    linkOpenMode?: 'current' | 'tab' | 'window'
 }
 
 export default class MindMap {
@@ -1571,10 +1573,11 @@ export default class MindMap {
                 evt.stopPropagation();
                 var href = internalLink.getAttribute("data-href") || internalLink.getAttribute("href");
                 if (href) {
+                    const openMode = this.view.plugin.settings.linkOpenMode;
                     (this.view.app.workspace as any).openLinkText(
                         href,
                         this.view.file.path,
-                        "window"
+                        openMode === "current" ? false : openMode
                     );
                 }
                 return;
@@ -1867,6 +1870,10 @@ export default class MindMap {
     }
 
     appMouseOverFn(evt: MouseEvent) {
+        if (!this.view?.plugin.settings.enableLinkPreview) {
+            return;
+        }
+
         const targetEl = evt.target as HTMLElement;
         const linkEl = targetEl.closest("a.internal-link") as HTMLElement;
         const sourcePath = this.view?.file?.path;

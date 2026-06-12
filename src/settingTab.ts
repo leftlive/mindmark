@@ -181,6 +181,35 @@ export class MindMapSettingsTab extends PluginSettingTab {
                 }),
             );
 
+        new Setting(containerEl)
+            .setName(t('Enable internal link preview'))
+            .setDesc(t('Enable internal link preview desc'))
+            .addToggle((toggle) =>
+                toggle
+                    .setValue(this.plugin.settings.enableLinkPreview)
+                    .onChange(async (value) => {
+                        this.plugin.settings.enableLinkPreview = value;
+                        await this.plugin.saveSettings();
+                        if (value) {
+                            await this.plugin.ensurePagePreviewEnabled();
+                        }
+                    }),
+            );
+
+        new Setting(containerEl)
+            .setName(t('Internal link open mode'))
+            .setDesc(t('Internal link open mode desc'))
+            .addDropdown((dropdown) =>
+                dropdown
+                    .addOption('current', t('Current tab'))
+                    .addOption('tab', t('New tab'))
+                    .addOption('window', t('New window'))
+                    .setValue(this.plugin.settings.linkOpenMode)
+                    .onChange(async (value: 'current' | 'tab' | 'window') => {
+                        this.plugin.settings.linkOpenMode = value;
+                        await this.plugin.saveSettings();
+                    }),
+            );
 
 
 

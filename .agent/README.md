@@ -77,8 +77,18 @@ Expected `activeType` is `mindmapViewUpgraded`.
 - `src/mindmap/Execute.ts`, `src/mindmap/Cmds.ts`, `src/mindmap/History.ts`: undoable command system.
 - `src/mindmap/FileSuggest.ts`: file suggestions during node editing.
 - `src/utils.ts`: shared utility code. `uuid()` belongs here to avoid circular imports.
+- `src/settings.ts` and `src/settingTab.ts`: persisted plugin settings and their Obsidian settings UI.
 
 ## Recent Bugs And Fixes
+
+### Internal link preview and opening behavior
+
+Settings:
+
+- `enableLinkPreview`: controls whether mind map links emit Obsidian `hover-link` events.
+- `linkOpenMode`: accepts `current`, `tab`, or `window`.
+
+The hover source is registered in `src/main.ts`. Event handling and click routing are in `src/mindmap/mindmap.ts`. When previews are enabled, MindMark ensures Obsidian's core `page-preview` plugin is active.
 
 ### Focus mode showed orphan edges
 
