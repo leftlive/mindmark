@@ -28,6 +28,13 @@ export default class MindMapPlugin extends Plugin {
     await this.loadSettings();
     await this.ensurePagePreviewEnabled();
 
+    const createMindmapRibbonIcon = this.addRibbonIcon(
+      mindmapIcon,
+      t('Create new mindmap'),
+      () => this.newMindMap()
+    );
+    createMindmapRibbonIcon.addClass('mindmark-ribbon-create');
+
     this.addCommand({
       id: 'Create New MindMap',
       name: `${t('Create new mindmap')}`,

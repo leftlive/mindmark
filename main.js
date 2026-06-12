@@ -39326,6 +39326,8 @@ class MindMapPlugin extends obsidian.Plugin {
         return __awaiter(this, void 0, void 0, function* () {
             yield this.loadSettings();
             yield this.ensurePagePreviewEnabled();
+            const createMindmapRibbonIcon = this.addRibbonIcon(mindmapIcon, t('Create new mindmap'), () => this.newMindMap());
+            createMindmapRibbonIcon.addClass('mindmark-ribbon-create');
             this.addCommand({
                 id: 'Create New MindMap',
                 name: `${t('Create new mindmap')}`,
