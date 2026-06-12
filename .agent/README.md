@@ -81,6 +81,10 @@ Expected `activeType` is `mindmapViewUpgraded`.
 
 ## Recent Bugs And Fixes
 
+### Image export captured only part of the map
+
+PNG and JPEG export use an off-screen clone sized from visible-node bounds. Do not resize or reposition the live `MindMap`; export must preserve its scroll position, zoom, and root coordinates.
+
 ### Focus mode exit selection
 
 All focus-mode exit paths use `MindMap.exitFocusMode()`. It restores normal visibility, reselects the previously focused node, and centers that node instead of returning selection to the root.

@@ -114,6 +114,16 @@ For temporary test notes:
 5. Inspect DOM or plugin state.
 6. Run `obsidian dev:errors`.
 
+### Image export changes
+
+1. Use a temporary map with deep branches on both sides.
+2. Record the visible node bounding box before export.
+3. Export PNG and JPEG at scale 1, then PNG at scale 2.
+4. Confirm image dimensions equal `(bounds + padding) * scale`.
+5. Open the exported image and inspect the outermost nodes.
+6. Confirm scroll position, zoom, and root position did not change.
+7. Delete all temporary notes and exported images.
+
 ### Settings changes
 
 1. Verify the control appears in the MindMark settings tab.
@@ -199,4 +209,5 @@ obsidian dev:errors
   Markdown mode through `mindmapFileModes`.
 - Internal-link previews depend on Obsidian's core `page-preview` plugin.
 - The Markdown return action must not be registered more than once per view.
-
+- Image export must render an isolated snapshot and must not move or resize the
+  live mind map.

@@ -172,12 +172,37 @@ export default class MindMap {
         const panel = document.createElement('div');
         panel.classList.add('mm-control-panel');
         panel.innerHTML = `
-            <div class="mm-ctrl-btn mm-ctrl-zoom-in" title="Zoom In">+</div>
-            <div class="mm-ctrl-btn mm-ctrl-zoom-out" title="Zoom Out">-</div>
-            <div class="mm-ctrl-btn mm-ctrl-center" title="Center/Fit">⛶</div>
+            <div class="mm-control-group">
+                <div class="mm-ctrl-btn mm-ctrl-undo" title="Undo">↶</div>
+                <div class="mm-ctrl-btn mm-ctrl-redo" title="Redo">↷</div>
+                <div class="mm-ctrl-btn mm-ctrl-export-png" title="Export PNG">📷</div>
+                <div class="mm-ctrl-btn mm-ctrl-export-jpg" title="Export JPG">🖼️</div>
+            </div>
+            <div class="mm-control-group">
+                <div class="mm-ctrl-btn mm-ctrl-zoom-in" title="Zoom In">+</div>
+                <div class="mm-ctrl-btn mm-ctrl-zoom-out" title="Zoom Out">-</div>
+                <div class="mm-ctrl-btn mm-ctrl-center" title="Center/Fit">⛶</div>
+            </div>
         `;
         // Append to containerEL so it stays fixed relative to the viewport, not the scaled content
         this.containerEL.appendChild(panel);
+
+        panel.querySelector('.mm-ctrl-undo').addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.undo();
+        });
+        panel.querySelector('.mm-ctrl-redo').addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.redo();
+        });
+        panel.querySelector('.mm-ctrl-export-png').addEventListener('click', (e) => {
+            e.stopPropagation();
+            if(this.view) this.view.exportToPng(2);
+        });
+        panel.querySelector('.mm-ctrl-export-jpg').addEventListener('click', (e) => {
+            e.stopPropagation();
+            if(this.view) this.view.exportToJpeg(2);
+        });
 
         panel.querySelector('.mm-ctrl-zoom-in').addEventListener('click', (e) => {
             e.stopPropagation();
@@ -1612,7 +1637,7 @@ export default class MindMap {
 
                  if(targetEl.closest('.mm-icon-delete-node')){
                     var selectNode = this.selectNode;
-                    if(!node.data.isRoot && selectNode){
+                    if(selectNode && !selectNode.data.isRoot){
                        selectNode.mindmap.execute("deleteNodeAndChild", { node: selectNode });
                        this._menuDom.style.display='none';
                     }
@@ -1703,6 +1728,7 @@ export default class MindMap {
         this.drag = false;
         this._indicateDom.style.display = 'none'
         this._menuDom.style.display = 'none';
+        document.querySelectorAll('.mm-drag-over-child').forEach(el => el.classList.remove('mm-drag-over-child'));
     }
 
     appDragover(evt: MouseEvent) {
@@ -1717,31 +1743,35 @@ export default class MindMap {
             this.dx = y - this.startY;
         }
 
+        // Clear previous child highlights
+        document.querySelectorAll('.mm-drag-over-child').forEach(el => el.classList.remove('mm-drag-over-child'));
+
         if(target.closest('.mm-node')){
-            var nodeId =target.closest('.mm-node').getAttribute('data-id');
+            var nodeEl = target.closest('.mm-node') as HTMLElement;
+            var nodeId = nodeEl.getAttribute('data-id');
             var node = this.getNodeById(nodeId);
             var box = node.getBox();
             this._dragType = this._getDragType(node, x, y);
-            this._indicateDom.style.display = 'block';
-            this._indicateDom.style.left = box.x + box.width / 2 - 40 / 2 + 'px';
-            this._indicateDom.style.top = box.y - 90 + 'px';
-            this._indicateDom.className = 'mm-node-layout-indicate';
 
-            if( this._dragType == 'top') {
-                this._indicateDom.classList.add('mm-arrow-top');
-            } else if ( this._dragType == 'down') {
-                this._indicateDom.classList.add('mm-arrow-down');
-            } else if ( this._dragType == 'left') {
-                this._indicateDom.classList.add('mm-arrow-left');
-            } else if ( this._dragType == 'right') {
-                this._indicateDom.classList.add('mm-arrow-right');
+            if (this._dragType.startsWith('child-')) {
+                // Dragging as a child: highlight the node itself
+                nodeEl.classList.add('mm-drag-over-child');
+                this._indicateDom.style.display = 'none';
             } else {
-                this._indicateDom.classList.add('drag-type');
-                var arr = this._dragType.split('-');
-                if (arr[1]) {
-                    this._indicateDom.classList.add('mm-arrow-' + arr[1]);
-                } else {
-                    this._indicateDom.classList.add('mm-arrow-right');
+                // Dragging as a sibling: show indicator line
+                this._indicateDom.style.display = 'block';
+                this._indicateDom.className = 'mm-node-layout-indicate';
+
+                if (this._dragType === 'top' || this._dragType === 'down') {
+                    this._indicateDom.classList.add('mm-indicator-horizontal');
+                    this._indicateDom.style.left = box.x + 'px';
+                    this._indicateDom.style.top = (this._dragType === 'top' ? box.y - 4 : box.y + box.height + 2) + 'px';
+                    this._indicateDom.style.width = box.width + 'px';
+                } else if (this._dragType === 'left' || this._dragType === 'right') {
+                    this._indicateDom.classList.add('mm-indicator-vertical');
+                    this._indicateDom.style.left = (this._dragType === 'left' ? box.x - 4 : box.x + box.width + 2) + 'px';
+                    this._indicateDom.style.top = box.y + 'px';
+                    this._indicateDom.style.height = box.height + 'px';
                 }
             }
         }else{
@@ -1755,52 +1785,35 @@ export default class MindMap {
 
         var box = node.contentEl.getBoundingClientRect();
 
-        box.x = box.x
-        box.y = box.y;
-
         var direct = node.direct;
+        var topThreshold = box.y + box.height * 0.25;
+        var bottomThreshold = box.y + box.height * 0.75;
+        var leftThreshold = box.x + box.width * 0.25;
+        var rightThreshold = box.x + box.width * 0.75;
+
         switch (direct) {
             case 'right':
-                if (y < box.y + box.height / 2 && x < box.x + box.width / 4 * 3) {
-                    return 'top'
-                }
-                if (y > box.y + box.height / 2 && x < box.x + box.width / 4 * 3) {
-                    return 'down'
-                }
-                return 'child-right'
+                if (y < topThreshold) return 'top';
+                if (y > bottomThreshold) return 'down';
+                return 'child-right';
             case 'left':
-                if (y < box.y + box.height / 2 && x > box.x + box.width / 4) {
-                    return 'top'
-                }
-                if (y > box.y + box.height / 2 && x > box.x + box.width / 4) {
-                    return 'down'
-                }
-
-                return 'child-left'
-
+                if (y < topThreshold) return 'top';
+                if (y > bottomThreshold) return 'down';
+                return 'child-left';
             case 'top':
             case 'up':
-
-                if (x < box.x + box.width / 4) {
-                    return 'left'
-                }
-                if (x > box.x + box.width / 4 * 3) {
-                    return 'right'
-                }
-
-                return 'child-top'
+                if (x < leftThreshold) return 'left';
+                if (x > rightThreshold) return 'right';
+                return 'child-top';
             case 'down':
             case 'bottom':
-                if (x < box.x + box.width / 4) {
-                    return 'left'
-                }
-                if (x > box.x + box.width / 4 * 3) {
-                    return 'right'
-                }
-                return 'child-down'
+                if (x < leftThreshold) return 'left';
+                if (x > rightThreshold) return 'right';
+                return 'child-down';
             default:
+                if (y < topThreshold) return 'top';
+                if (y > bottomThreshold) return 'down';
                 return 'child';
-
         }
     }
 
@@ -2236,14 +2249,14 @@ export default class MindMap {
             this.traverseBF((n: INode) => {
                 if (!activeSubtree.has(n)) {
                     n.containEl.classList.add('mm-node-dimmed');
-                    n.containEl.style.opacity = '0';
-                    n.containEl.style.visibility = 'hidden';
-                    n.containEl.style.pointerEvents = 'none';
+                    n.containEl.style.opacity = '';
+                    n.containEl.style.visibility = '';
+                    n.containEl.style.pointerEvents = '';
                 } else {
                     n.containEl.classList.remove('mm-node-dimmed');
-                    n.containEl.style.opacity = '1';
-                    n.containEl.style.visibility = 'visible';
-                    n.containEl.style.pointerEvents = 'auto';
+                    n.containEl.style.opacity = '';
+                    n.containEl.style.visibility = '';
+                    n.containEl.style.pointerEvents = '';
                 }
             }, this.root);
             
@@ -2256,9 +2269,9 @@ export default class MindMap {
         } else {
             this.traverseBF((n: INode) => {
                 n.containEl.classList.remove('mm-node-dimmed');
-                n.containEl.style.opacity = '1';
-                n.containEl.style.visibility = 'visible';
-                n.containEl.style.pointerEvents = 'auto';
+                n.containEl.style.opacity = '';
+                n.containEl.style.visibility = '';
+                n.containEl.style.pointerEvents = '';
             }, this.root);
             
             this.appEl.style.backgroundColor = '';

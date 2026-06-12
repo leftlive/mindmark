@@ -1113,6 +1113,8 @@ class Node$1 {
         });
     }
     expand() {
+        this.mindmap.appEl.classList.add('mm-no-transition');
+        setTimeout(() => this.mindmap.appEl.classList.remove('mm-no-transition'), 50);
         this.isExpand = true;
         function show(node) {
             node.show();
@@ -1130,6 +1132,8 @@ class Node$1 {
         }
     }
     collapse() {
+        this.mindmap.appEl.classList.add('mm-no-transition');
+        setTimeout(() => this.mindmap.appEl.classList.remove('mm-no-transition'), 50);
         this.isExpand = false;
         function hide(node) {
             node.hide();
@@ -1139,7 +1143,7 @@ class Node$1 {
                 });
             }
         }
-        this.children.forEach((c) => {
+        this.children.forEach(c => {
             hide(c);
         });
         if (!this.containEl.classList.contains('mm-node-collapse')) {
@@ -1162,6 +1166,7 @@ class Layout {
         this.rights = [];
         this.colors = [];
         this.lineWidth = 1;
+        this.pathMap = {};
         this.root = node || null;
         this.mind = mind || (node === null || node === void 0 ? void 0 : node.mindmap) || null;
         this.direct = direct || 'mindmap';
@@ -1506,14 +1511,19 @@ class Layout {
     }
     createLink() {
         var me = this;
-        this.svgDom && this.svgDom.clear();
+        // this.svgDom && this.svgDom.clear(); // Removed to support transition animation
         if (this.root.getChildren().length == 0) {
+            for (const id in this.pathMap) {
+                this.pathMap[id].remove();
+            }
+            this.pathMap = {};
             return;
         }
         var dis = this.levelDis;
         var root = this.root;
         var lineWidth = this.lineWidth;
         var rootLevel = this.root.getLevel();
+        var activePaths = new Set();
         function createLine(node) {
             if (!node.isExpand) {
                 return;
@@ -1585,21 +1595,30 @@ class Layout {
                     createLine(child);
                     return;
                 }
-                if (level == rootLevel) {
-                    var line1 = me.svgDom.path().stroke({
-                        color: _stroke,
-                        width: lineWidth + 1,
-                        linecap: 'round',
-                        linejoin: 'round'
-                    }).fill('none');
+                var pathId = node.data.id + '->' + child.data.id;
+                activePaths.add(pathId);
+                var line1 = me.pathMap[pathId];
+                if (!line1) {
+                    if (level == rootLevel) {
+                        line1 = me.svgDom.path().stroke({
+                            color: _stroke,
+                            width: lineWidth + 1,
+                            linecap: 'round',
+                            linejoin: 'round'
+                        }).fill('none');
+                    }
+                    else {
+                        line1 = me.svgDom.path().stroke({
+                            color: _stroke,
+                            width: lineWidth,
+                            linecap: 'round',
+                            linejoin: 'round'
+                        }).fill('none');
+                    }
+                    me.pathMap[pathId] = line1;
                 }
                 else {
-                    var line1 = me.svgDom.path().stroke({
-                        color: _stroke,
-                        width: lineWidth,
-                        linecap: 'round',
-                        linejoin: 'round'
-                    }).fill('none');
+                    line1.stroke({ color: _stroke });
                 }
                 if (lineWidth % 2 == 1) {
                     parseInt(childPos.x + '') - 0.5;
@@ -1668,11 +1687,18 @@ class Layout {
             'var(--mm-color-7)',
             'var(--mm-color-8)'
         ];
+        let colorArray = this.colors && this.colors.length > 0 ? this.colors : obsidianColors;
         //Set Node link Color
         this.root.children.forEach((c, i) => {
-            c.stroke = obsidianColors[i % obsidianColors.length];
+            c.stroke = colorArray[i % colorArray.length];
         });
         createLine(root);
+        for (const id in this.pathMap) {
+            if (!activePaths.has(id)) {
+                this.pathMap[id].remove();
+                delete this.pathMap[id];
+            }
+        }
     }
 }
 
@@ -8204,12 +8230,38 @@ class MindMap {
         const panel = document.createElement('div');
         panel.classList.add('mm-control-panel');
         panel.innerHTML = `
-            <div class="mm-ctrl-btn mm-ctrl-zoom-in" title="Zoom In">+</div>
-            <div class="mm-ctrl-btn mm-ctrl-zoom-out" title="Zoom Out">-</div>
-            <div class="mm-ctrl-btn mm-ctrl-center" title="Center/Fit">⛶</div>
+            <div class="mm-control-group">
+                <div class="mm-ctrl-btn mm-ctrl-undo" title="Undo">↶</div>
+                <div class="mm-ctrl-btn mm-ctrl-redo" title="Redo">↷</div>
+                <div class="mm-ctrl-btn mm-ctrl-export-png" title="Export PNG">📷</div>
+                <div class="mm-ctrl-btn mm-ctrl-export-jpg" title="Export JPG">🖼️</div>
+            </div>
+            <div class="mm-control-group">
+                <div class="mm-ctrl-btn mm-ctrl-zoom-in" title="Zoom In">+</div>
+                <div class="mm-ctrl-btn mm-ctrl-zoom-out" title="Zoom Out">-</div>
+                <div class="mm-ctrl-btn mm-ctrl-center" title="Center/Fit">⛶</div>
+            </div>
         `;
         // Append to containerEL so it stays fixed relative to the viewport, not the scaled content
         this.containerEL.appendChild(panel);
+        panel.querySelector('.mm-ctrl-undo').addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.undo();
+        });
+        panel.querySelector('.mm-ctrl-redo').addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.redo();
+        });
+        panel.querySelector('.mm-ctrl-export-png').addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (this.view)
+                this.view.exportToPng(2);
+        });
+        panel.querySelector('.mm-ctrl-export-jpg').addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (this.view)
+                this.view.exportToJpeg(2);
+        });
         panel.querySelector('.mm-ctrl-zoom-in').addEventListener('click', (e) => {
             e.stopPropagation();
             this.setScale("up");
@@ -9297,7 +9349,7 @@ class MindMap {
                 }
                 if (targetEl.closest('.mm-icon-delete-node')) {
                     var selectNode = this.selectNode;
-                    if (!node.data.isRoot && selectNode) {
+                    if (selectNode && !selectNode.data.isRoot) {
                         selectNode.mindmap.execute("deleteNodeAndChild", { node: selectNode });
                         this._menuDom.style.display = 'none';
                     }
@@ -9381,6 +9433,7 @@ class MindMap {
         this.drag = false;
         this._indicateDom.style.display = 'none';
         this._menuDom.style.display = 'none';
+        document.querySelectorAll('.mm-drag-over-child').forEach(el => el.classList.remove('mm-drag-over-child'));
     }
     appDragover(evt) {
         evt.preventDefault();
@@ -9392,35 +9445,34 @@ class MindMap {
             this.dx = x - this.startX;
             this.dx = y - this.startY;
         }
+        // Clear previous child highlights
+        document.querySelectorAll('.mm-drag-over-child').forEach(el => el.classList.remove('mm-drag-over-child'));
         if (target.closest('.mm-node')) {
-            var nodeId = target.closest('.mm-node').getAttribute('data-id');
+            var nodeEl = target.closest('.mm-node');
+            var nodeId = nodeEl.getAttribute('data-id');
             var node = this.getNodeById(nodeId);
             var box = node.getBox();
             this._dragType = this._getDragType(node, x, y);
-            this._indicateDom.style.display = 'block';
-            this._indicateDom.style.left = box.x + box.width / 2 - 40 / 2 + 'px';
-            this._indicateDom.style.top = box.y - 90 + 'px';
-            this._indicateDom.className = 'mm-node-layout-indicate';
-            if (this._dragType == 'top') {
-                this._indicateDom.classList.add('mm-arrow-top');
-            }
-            else if (this._dragType == 'down') {
-                this._indicateDom.classList.add('mm-arrow-down');
-            }
-            else if (this._dragType == 'left') {
-                this._indicateDom.classList.add('mm-arrow-left');
-            }
-            else if (this._dragType == 'right') {
-                this._indicateDom.classList.add('mm-arrow-right');
+            if (this._dragType.startsWith('child-')) {
+                // Dragging as a child: highlight the node itself
+                nodeEl.classList.add('mm-drag-over-child');
+                this._indicateDom.style.display = 'none';
             }
             else {
-                this._indicateDom.classList.add('drag-type');
-                var arr = this._dragType.split('-');
-                if (arr[1]) {
-                    this._indicateDom.classList.add('mm-arrow-' + arr[1]);
+                // Dragging as a sibling: show indicator line
+                this._indicateDom.style.display = 'block';
+                this._indicateDom.className = 'mm-node-layout-indicate';
+                if (this._dragType === 'top' || this._dragType === 'down') {
+                    this._indicateDom.classList.add('mm-indicator-horizontal');
+                    this._indicateDom.style.left = box.x + 'px';
+                    this._indicateDom.style.top = (this._dragType === 'top' ? box.y - 4 : box.y + box.height + 2) + 'px';
+                    this._indicateDom.style.width = box.width + 'px';
                 }
-                else {
-                    this._indicateDom.classList.add('mm-arrow-right');
+                else if (this._dragType === 'left' || this._dragType === 'right') {
+                    this._indicateDom.classList.add('mm-indicator-vertical');
+                    this._indicateDom.style.left = (this._dragType === 'left' ? box.x - 4 : box.x + box.width + 2) + 'px';
+                    this._indicateDom.style.top = box.y + 'px';
+                    this._indicateDom.style.height = box.height + 'px';
                 }
             }
         }
@@ -9432,45 +9484,43 @@ class MindMap {
         if (!node)
             return;
         var box = node.contentEl.getBoundingClientRect();
-        box.x = box.x;
-        box.y = box.y;
         var direct = node.direct;
+        var topThreshold = box.y + box.height * 0.25;
+        var bottomThreshold = box.y + box.height * 0.75;
+        var leftThreshold = box.x + box.width * 0.25;
+        var rightThreshold = box.x + box.width * 0.75;
         switch (direct) {
             case 'right':
-                if (y < box.y + box.height / 2 && x < box.x + box.width / 4 * 3) {
+                if (y < topThreshold)
                     return 'top';
-                }
-                if (y > box.y + box.height / 2 && x < box.x + box.width / 4 * 3) {
+                if (y > bottomThreshold)
                     return 'down';
-                }
                 return 'child-right';
             case 'left':
-                if (y < box.y + box.height / 2 && x > box.x + box.width / 4) {
+                if (y < topThreshold)
                     return 'top';
-                }
-                if (y > box.y + box.height / 2 && x > box.x + box.width / 4) {
+                if (y > bottomThreshold)
                     return 'down';
-                }
                 return 'child-left';
             case 'top':
             case 'up':
-                if (x < box.x + box.width / 4) {
+                if (x < leftThreshold)
                     return 'left';
-                }
-                if (x > box.x + box.width / 4 * 3) {
+                if (x > rightThreshold)
                     return 'right';
-                }
                 return 'child-top';
             case 'down':
             case 'bottom':
-                if (x < box.x + box.width / 4) {
+                if (x < leftThreshold)
                     return 'left';
-                }
-                if (x > box.x + box.width / 4 * 3) {
+                if (x > rightThreshold)
                     return 'right';
-                }
                 return 'child-down';
             default:
+                if (y < topThreshold)
+                    return 'top';
+                if (y > bottomThreshold)
+                    return 'down';
                 return 'child';
         }
     }
@@ -9856,15 +9906,15 @@ class MindMap {
             this.traverseBF((n) => {
                 if (!activeSubtree.has(n)) {
                     n.containEl.classList.add('mm-node-dimmed');
-                    n.containEl.style.opacity = '0';
-                    n.containEl.style.visibility = 'hidden';
-                    n.containEl.style.pointerEvents = 'none';
+                    n.containEl.style.opacity = '';
+                    n.containEl.style.visibility = '';
+                    n.containEl.style.pointerEvents = '';
                 }
                 else {
                     n.containEl.classList.remove('mm-node-dimmed');
-                    n.containEl.style.opacity = '1';
-                    n.containEl.style.visibility = 'visible';
-                    n.containEl.style.pointerEvents = 'auto';
+                    n.containEl.style.opacity = '';
+                    n.containEl.style.visibility = '';
+                    n.containEl.style.pointerEvents = '';
                 }
             }, this.root);
             const overlayOpacity = Math.min(0.8, Math.max(0, Number(this.setting.focusOverlayOpacity) || 0));
@@ -9874,9 +9924,9 @@ class MindMap {
         else {
             this.traverseBF((n) => {
                 n.containEl.classList.remove('mm-node-dimmed');
-                n.containEl.style.opacity = '1';
-                n.containEl.style.visibility = 'visible';
-                n.containEl.style.pointerEvents = 'auto';
+                n.containEl.style.opacity = '';
+                n.containEl.style.visibility = '';
+                n.containEl.style.pointerEvents = '';
             }, this.root);
             this.appEl.style.backgroundColor = '';
             this.appEl.style.boxShadow = '';
@@ -38898,90 +38948,110 @@ class MindMapView extends obsidian.TextFileView {
         if (!this.mindmap) {
             return;
         }
-        const { rootBox, oldScrollLeft, oldScrollTop } = this.prepareForExport();
-        setTimeout(() => {
-            domToImageMore.toPng(this.mindmap.contentEL, { scale: i_scale }).then((dataUrl) => __awaiter(this, void 0, void 0, function* () {
-                var img = new Image();
-                img.src = dataUrl;
-                const fileName = this.mindmap.path.replace(/\.md$/, '.png');
-                const arrayBuffer = yield this.dataURLtoBlob(dataUrl).arrayBuffer();
-                this.app.vault.adapter.writeBinary(fileName, arrayBuffer)
-                    .then(() => {
-                    new obsidian.Notice(`Mindmap exported as PNG: ${fileName}`);
-                    this.restoreMindmap(rootBox, oldScrollLeft, oldScrollTop);
-                })
-                    .catch(err => {
-                    console.error('Failed to save PNG file:', err);
-                    new obsidian.Notice(`Failed to export mindmap as PNG: ${err}`);
-                    this.restoreMindmap(rootBox, oldScrollLeft, oldScrollTop);
-                });
-            })).catch(err => {
-                this.restoreMindmap(rootBox, oldScrollLeft, oldScrollTop);
-                new obsidian.Notice(`Failed to export mindmap as PNG: ${err}`);
-            });
-        }, 200);
+        return this.exportImage('png', i_scale);
     }
     exportToJpeg(i_scale) {
         if (!this.mindmap) {
             return;
         }
-        const { rootBox, oldScrollLeft, oldScrollTop } = this.prepareForExport();
-        setTimeout(() => {
-            domToImageMore.toJpeg(this.mindmap.contentEL, { quality: 1.0, scale: i_scale }).then((dataUrl) => __awaiter(this, void 0, void 0, function* () {
-                var img = new Image();
-                img.src = dataUrl;
-                const fileName = this.mindmap.path.replace(/\.md$/, '.jpeg');
-                const arrayBuffer = yield this.dataURLtoBlob(dataUrl).arrayBuffer();
-                this.app.vault.adapter.writeBinary(fileName, arrayBuffer)
-                    .then(() => {
-                    new obsidian.Notice(`Mindmap exported as JPEG: ${fileName}`);
-                    this.restoreMindmap(rootBox, oldScrollLeft, oldScrollTop);
-                })
-                    .catch(err => {
-                    console.error('Failed to save JPEG file:', err);
-                    new obsidian.Notice(`Failed to export mindmap as JPEG: ${err}`);
-                    this.restoreMindmap(rootBox, oldScrollLeft, oldScrollTop);
-                });
-            })).catch(err => {
-                this.restoreMindmap(rootBox, oldScrollLeft, oldScrollTop);
-                new obsidian.Notice(`Failed to export mindmap as JPEG: ${err}`);
-            });
-        }, 200);
+        return this.exportImage('jpeg', i_scale);
     }
-    prepareForExport() {
-        if (!this.mindmap) {
-            return { rootBox: null, oldScrollLeft: 0, oldScrollTop: 0 };
-        }
-        var nodes = [];
-        this.mindmap.traverseDF((n) => {
-            if (n.isShow()) {
-                nodes.push(n);
+    exportImage(format, scale) {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (!this.mindmap) {
+                return;
+            }
+            let exportEl = null;
+            const extension = format === 'png' ? '.png' : '.jpeg';
+            try {
+                const snapshot = this.createExportSnapshot();
+                exportEl = snapshot.element;
+                const options = {
+                    width: snapshot.width,
+                    height: snapshot.height,
+                    scale: Math.max(1, scale),
+                    bgcolor: format === 'jpeg'
+                        ? this.getExportBackgroundColor()
+                        : undefined,
+                };
+                const dataUrl = format === 'png'
+                    ? yield domToImageMore.toPng(exportEl, options)
+                    : yield domToImageMore.toJpeg(exportEl, Object.assign(Object.assign({}, options), { quality: 1.0 }));
+                const fileName = this.mindmap.path.replace(/\.md$/, extension);
+                const arrayBuffer = yield this.dataURLtoBlob(dataUrl).arrayBuffer();
+                yield this.app.vault.adapter.writeBinary(fileName, arrayBuffer);
+                new obsidian.Notice(`Mindmap exported as ${format.toUpperCase()}: ${fileName}`);
+            }
+            catch (err) {
+                console.error(`Failed to export mindmap as ${format.toUpperCase()}:`, err);
+                new obsidian.Notice(`Failed to export mindmap as ${format.toUpperCase()}: ${err}`);
+            }
+            finally {
+                exportEl === null || exportEl === void 0 ? void 0 : exportEl.remove();
             }
         });
-        var oldScrollLeft = this.mindmap.containerEL.scrollLeft;
-        var oldScrollTop = this.mindmap.containerEL.scrollTop;
-        var box = this.mindmap.getBoundingRect(nodes);
-        var rootBox = this.mindmap.root.getPosition();
-        var disX = 0, disY = 0;
-        if (box.x > 60) {
-            disX = box.x - 60;
+    }
+    createExportSnapshot() {
+        if (!this.mindmap) {
+            throw new Error('Mindmap is not available');
         }
-        if (box.y > 60) {
-            disY = box.y - 60;
+        const nodes = [];
+        this.mindmap.traverseDF((node) => {
+            if (node.isShow() && !node.containEl.classList.contains('mm-node-dimmed')) {
+                nodes.push(node);
+            }
+        });
+        if (nodes.length === 0) {
+            throw new Error('No visible nodes to export');
         }
-        this.mindmap.root.setPosition(rootBox.x - disX, rootBox.y - disY);
-        this.mindmap.refresh();
-        var w = box.width + 120;
-        var h = box.height + 120;
-        this.mindmap.contentEL.style.width = w + 'px';
-        this.mindmap.contentEL.style.height = h + 'px';
-        return { rootBox, oldScrollLeft, oldScrollTop };
+        const padding = 60;
+        const box = this.mindmap.getBoundingRect(nodes);
+        const width = Math.max(1, Math.ceil(box.width + padding * 2));
+        const height = Math.max(1, Math.ceil(box.height + padding * 2));
+        const sourceWidth = this.mindmap.contentEL.offsetWidth;
+        const sourceHeight = this.mindmap.contentEL.offsetHeight;
+        const wrapper = document.createElement('div');
+        wrapper.className = 'mindmark-export-snapshot';
+        wrapper.style.position = 'fixed';
+        wrapper.style.left = '-100000px';
+        wrapper.style.top = '0';
+        wrapper.style.width = `${width}px`;
+        wrapper.style.height = `${height}px`;
+        wrapper.style.overflow = 'hidden';
+        wrapper.style.pointerEvents = 'none';
+        wrapper.style.background = this.getExportBackgroundColor();
+        const contentClone = this.mindmap.contentEL.cloneNode(true);
+        contentClone.style.position = 'absolute';
+        contentClone.style.left = `${padding - box.x}px`;
+        contentClone.style.top = `${padding - box.y}px`;
+        contentClone.style.width = `${sourceWidth}px`;
+        contentClone.style.height = `${sourceHeight}px`;
+        contentClone.style.transform = 'none';
+        contentClone.style.transformOrigin = '0 0';
+        contentClone.querySelectorAll('.mm-node-dimmed').forEach((element) => {
+            element.style.display = 'none';
+        });
+        wrapper.appendChild(contentClone);
+        document.body.appendChild(wrapper);
+        return { element: wrapper, width, height };
+    }
+    getExportBackgroundColor() {
+        if (!this.mindmap) {
+            return '#ffffff';
+        }
+        const configuredBackground = this.plugin.settings.background;
+        if (configuredBackground && configuredBackground !== 'transparent') {
+            return configuredBackground;
+        }
+        return getComputedStyle(this.mindmap.containerEL)
+            .getPropertyValue('--background-primary')
+            .trim() || '#ffffff';
     }
     restoreMindmap(rootBox, left, top) {
-        if (!this.mindmap) {
+        if (!this.mindmap || !rootBox) {
             return;
         }
-        var size = this.plugin.settings.canvasSize;
+        const size = this.plugin.settings.canvasSize;
         this.mindmap.contentEL.style.width = size + 'px';
         this.mindmap.contentEL.style.height = size + 'px';
         this.mindmap.containerEL.scrollTop = top;
@@ -39119,19 +39189,22 @@ class MindMapView extends obsidian.TextFileView {
         this.mindmap = new MindMap(mindData, this.contentEl, this.plugin.settings, this);
         this.mindmap.colors = this.colors;
         if (this.firstInit) {
+            const mindmap = this.mindmap;
             setTimeout(() => {
-                var leaf = this.leaf;
-                if (leaf) {
-                    var view = leaf.view;
-                    this.mindmap.path = view === null || view === void 0 ? void 0 : view.file.path;
-                    if (view.file) {
-                        this.fileCache = this.app.metadataCache.getFileCache(view.file);
-                        this.yamlString = this.getFrontMatter();
-                    }
+                if (this.mindmap !== mindmap || !this.file) {
+                    return;
                 }
-                this.mindmap.init();
-                this.mindmap.refresh();
-                this.mindmap.view = this;
+                mindmap.path = this.file.path;
+                this.fileCache = this.app.metadataCache.getFileCache(this.file);
+                this.yamlString = this.getFrontMatter();
+                mindmap.init();
+                mindmap.refresh();
+                mindmap.view = this;
+                setTimeout(() => {
+                    if (this.mindmap === mindmap && mindmap.appEl) {
+                        mindmap.appEl.classList.add('mm-ready');
+                    }
+                }, 50);
                 // Auto-edit root node if the mindmap is completely new
                 if (mdText.trim() === "") {
                     setTimeout(() => {
@@ -39154,6 +39227,11 @@ class MindMapView extends obsidian.TextFileView {
             this.mindmap.init();
             this.mindmap.refresh();
             this.mindmap.view = this;
+            setTimeout(() => {
+                if (this.mindmap && this.mindmap.appEl) {
+                    this.mindmap.appEl.classList.add('mm-ready');
+                }
+            }, 50);
         }
     }
     onunload() {
@@ -39416,22 +39494,42 @@ class MindMapSettingsTab extends obsidian.PluginSettingTab {
                 v.mindmap.refresh();
             });
         }));
-        new obsidian.Setting(containerEl)
+        const strokeSetting = new obsidian.Setting(containerEl)
             .setName(`${t('Stroke Array')}`)
-            .setDesc(`${t('Stroke Array Desc')}`)
-            .addText(text => {
+            .setDesc(`${t('Stroke Array Desc')}`);
+        const palettes = [
+            ['#e63946', '#f4a261', '#e9c46a', '#2a9d8f', '#264653'],
+            ['#cdb4db', '#ffc8dd', '#ffafcc', '#bde0fe', '#a2d2ff'],
+            ['#ff595e', '#ffca3a', '#8ac926', '#1982c4', '#6a4c93'],
+            ['#03045e', '#0077b6', '#00b4d8', '#90e0ef', '#caf0f8'],
+            ['#d8f3dc', '#b7e4c7', '#95d5b2', '#74c69d', '#52b788', '#40916c', '#2d6a4f', '#1b4332'],
+            ['#cb997e', '#ddbea9', '#ffe8d6', '#b7b7a4', '#a5a58d', '#6b705c'],
+            ['#22223b', '#4a4e69', '#9a8c98', '#c9ada7', '#f2e9e4'], // Vintage
+        ];
+        const palettesDiv = strokeSetting.settingEl.createDiv('mm-color-palettes');
+        palettes.forEach((palette) => {
             var _a;
-            return text
-                .setValue(((_a = this.plugin.settings.strokeArray) === null || _a === void 0 ? void 0 : _a.toString()) || '')
-                .setPlaceholder('Example: red,orange,blue ...')
-                .onChange((value) => {
-                //this.plugin.settings.strokeArray = value
-                this.plugin.settings.strokeArray = value.split(',');
+            const paletteEl = palettesDiv.createDiv('mm-color-palette');
+            const currentStroke = ((_a = this.plugin.settings.strokeArray) === null || _a === void 0 ? void 0 : _a.join(',')) || '';
+            const isMatch = currentStroke === palette.join(',');
+            if (isMatch) {
+                paletteEl.classList.add('is-active');
+            }
+            palette.forEach(color => {
+                const block = paletteEl.createDiv('mm-color-block');
+                block.style.backgroundColor = color;
+            });
+            paletteEl.onclick = () => {
+                // Update UI active state
+                palettesDiv.querySelectorAll('.mm-color-palette').forEach(el => el.classList.remove('is-active'));
+                paletteEl.classList.add('is-active');
+                // Save setting
+                this.plugin.settings.strokeArray = palette;
                 this.plugin.saveData(this.plugin.settings);
+                // Update views
                 const mindmapLeaves = this.app.workspace.getLeavesOfType(mindmapViewType);
                 mindmapLeaves.forEach((leaf) => {
                     var v = leaf.view;
-                    //v.mindmap.setting.strokeArray = this.plugin.settings.strokeArray.split(',');
                     v.mindmap.setting.strokeArray = this.plugin.settings.strokeArray;
                     if (v.mindmap.mmLayout) {
                         v.mindmap.mmLayout.colors = v.mindmap.setting.strokeArray;
@@ -39442,7 +39540,7 @@ class MindMapSettingsTab extends obsidian.PluginSettingTab {
                     });
                     v.mindmap.refresh();
                 });
-            });
+            };
         });
         new obsidian.Setting(containerEl)
             .setName('Display moved on current node')

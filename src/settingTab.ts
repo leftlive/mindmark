@@ -138,34 +138,61 @@ export class MindMapSettingsTab extends PluginSettingTab {
                         });
                     }));
 
-        new Setting(containerEl)
+        const strokeSetting = new Setting(containerEl)
             .setName(`${t('Stroke Array')}`)
-            .setDesc(`${t('Stroke Array Desc')}`)
-            .addText(text =>
-                text
-                    .setValue(this.plugin.settings.strokeArray?.toString() || '')
-                    .setPlaceholder('Example: red,orange,blue ...')
-                    .onChange((value: string) => {
-                        //this.plugin.settings.strokeArray = value
-                        this.plugin.settings.strokeArray = value.split(',');
-                        this.plugin.saveData(this.plugin.settings);
-                        const mindmapLeaves = this.app.workspace.getLeavesOfType(mindmapViewType);
+            .setDesc(`${t('Stroke Array Desc')}`);
 
-                        mindmapLeaves.forEach((leaf) => {
-                            var v = leaf.view as MindMapView;
-                            //v.mindmap.setting.strokeArray = this.plugin.settings.strokeArray.split(',');
-                            v.mindmap.setting.strokeArray = this.plugin.settings.strokeArray;
-                            if( v.mindmap.mmLayout){
-                                v.mindmap.mmLayout.colors=v.mindmap.setting.strokeArray;
-                            }
+        const palettes = [
+            ['#e63946', '#f4a261', '#e9c46a', '#2a9d8f', '#264653'], // Classic
+            ['#cdb4db', '#ffc8dd', '#ffafcc', '#bde0fe', '#a2d2ff'], // Pastel
+            ['#ff595e', '#ffca3a', '#8ac926', '#1982c4', '#6a4c93'], // Rainbow
+            ['#03045e', '#0077b6', '#00b4d8', '#90e0ef', '#caf0f8'], // Ocean
+            ['#d8f3dc', '#b7e4c7', '#95d5b2', '#74c69d', '#52b788', '#40916c', '#2d6a4f', '#1b4332'], // Forest
+            ['#cb997e', '#ddbea9', '#ffe8d6', '#b7b7a4', '#a5a58d', '#6b705c'], // Earth
+            ['#22223b', '#4a4e69', '#9a8c98', '#c9ada7', '#f2e9e4'], // Vintage
+        ];
 
-                            v.mindmap.traverseBF((n: MyNode) => {
-                                n.boundingRect = null;
-                                n.refreshBox();
-                            })
-                            v.mindmap.refresh();
-                        });
-                    }));
+        const palettesDiv = strokeSetting.settingEl.createDiv('mm-color-palettes');
+
+        palettes.forEach((palette) => {
+            const paletteEl = palettesDiv.createDiv('mm-color-palette');
+            const currentStroke = this.plugin.settings.strokeArray?.join(',') || '';
+            const isMatch = currentStroke === palette.join(',');
+
+            if (isMatch) {
+                paletteEl.classList.add('is-active');
+            }
+
+            palette.forEach(color => {
+                const block = paletteEl.createDiv('mm-color-block');
+                block.style.backgroundColor = color;
+            });
+
+            paletteEl.onclick = () => {
+                // Update UI active state
+                palettesDiv.querySelectorAll('.mm-color-palette').forEach(el => el.classList.remove('is-active'));
+                paletteEl.classList.add('is-active');
+
+                // Save setting
+                this.plugin.settings.strokeArray = palette;
+                this.plugin.saveData(this.plugin.settings);
+
+                // Update views
+                const mindmapLeaves = this.app.workspace.getLeavesOfType(mindmapViewType);
+                mindmapLeaves.forEach((leaf) => {
+                    var v = leaf.view as MindMapView;
+                    v.mindmap.setting.strokeArray = this.plugin.settings.strokeArray;
+                    if( v.mindmap.mmLayout){
+                        v.mindmap.mmLayout.colors = v.mindmap.setting.strokeArray;
+                    }
+                    v.mindmap.traverseBF((n: MyNode) => {
+                        n.boundingRect = null;
+                        n.refreshBox();
+                    })
+                    v.mindmap.refresh();
+                });
+            };
+        });
 
         new Setting(containerEl)
             .setName('Display moved on current node')

@@ -16,6 +16,7 @@ export default class Layout {
     rights:Node[]=[];
     colors:string[]=[];
     lineWidth = 1;
+    pathMap: Record<string, any> = {};
     constructor(node:Node,direct?:string,colors?:string[], mind?:MindMap){
        this.root = node||null;
        this.mind = mind || node?.mindmap || null;
@@ -393,8 +394,12 @@ export default class Layout {
 
     createLink(){
         var me = this;
-        this.svgDom && this.svgDom.clear();
+        // this.svgDom && this.svgDom.clear(); // Removed to support transition animation
         if (this.root.getChildren().length == 0) {
+            for (const id in this.pathMap) {
+                this.pathMap[id].remove();
+            }
+            this.pathMap = {};
             return;
         }
 
@@ -404,6 +409,7 @@ export default class Layout {
 
 		var rootLevel = this.root.getLevel();
 
+        var activePaths = new Set<string>();
 
 		function createLine(node:Node) {
 			if (!node.isExpand) {
@@ -490,21 +496,29 @@ export default class Layout {
 					return;
 				}
 
-				if (level == rootLevel) {
-					var line1 = me.svgDom.path().stroke({
-						color: _stroke,
-						width: lineWidth + 1,
-						linecap: 'round',
-						linejoin: 'round'
-					}).fill('none');
-				} else {
-					var line1 = me.svgDom.path().stroke({
-						color: _stroke,
-						width: lineWidth,
-						linecap: 'round',
-						linejoin: 'round'
-					}).fill('none');
-				}
+                var pathId = node.data.id + '->' + child.data.id;
+                activePaths.add(pathId);
+                var line1 = me.pathMap[pathId];
+                if (!line1) {
+                    if (level == rootLevel) {
+                        line1 = me.svgDom.path().stroke({
+                            color: _stroke,
+                            width: lineWidth + 1,
+                            linecap: 'round',
+                            linejoin: 'round'
+                        }).fill('none');
+                    } else {
+                        line1 = me.svgDom.path().stroke({
+                            color: _stroke,
+                            width: lineWidth,
+                            linecap: 'round',
+                            linejoin: 'round'
+                        }).fill('none');
+                    }
+                    me.pathMap[pathId] = line1;
+                } else {
+                    line1.stroke({ color: _stroke });
+                }
 
 				if (lineWidth % 2 == 1) {
 					var x11 = parseInt(childPos.x+'') - 0.5;
@@ -586,12 +600,21 @@ export default class Layout {
 			'var(--mm-color-8)'
 		];
 
+        let colorArray = this.colors && this.colors.length > 0 ? this.colors : obsidianColors;
+
         //Set Node link Color
         this.root.children.forEach((c:Node,i:number)=>{
-            c.stroke = obsidianColors[i % obsidianColors.length];
+            c.stroke = colorArray[i % colorArray.length];
         });
 
 		createLine(root);
+
+        for (const id in this.pathMap) {
+            if (!activePaths.has(id)) {
+                this.pathMap[id].remove();
+                delete this.pathMap[id];
+            }
+        }
     }
 
     

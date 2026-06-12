@@ -842,6 +842,8 @@ export default class Node {
     }
 
     expand(){
+        this.mindmap.appEl.classList.add('mm-no-transition');
+        setTimeout(() => this.mindmap.appEl.classList.remove('mm-no-transition'), 50);
         this.isExpand =true;
         function show(node:Node) {
             node.show();
@@ -860,7 +862,8 @@ export default class Node {
     }
 
     collapse(){
-
+        this.mindmap.appEl.classList.add('mm-no-transition');
+        setTimeout(() => this.mindmap.appEl.classList.remove('mm-no-transition'), 50);
         this.isExpand = false;
         function hide(node:Node) {
             node.hide();
@@ -869,9 +872,8 @@ export default class Node {
                     hide(c);
                 });
             }
-        };
-
-        this.children.forEach((c:Node) => {
+        }
+        this.children.forEach(c => {
             hide(c);
         });
 
@@ -879,7 +881,5 @@ export default class Node {
             this.containEl.classList.add('mm-node-collapse')
         }
     }
-
-
 
 }
