@@ -1,43 +1,31 @@
 # MindMark
 
-MindMark is a local Obsidian plugin for editing Markdown files as mind maps. It is maintained as the source project for the plugin installed in the user's Obsidian vault.
+MindMark is an Obsidian plugin for editing Markdown files as visual mind maps.
 
-This repository lives at:
+It keeps your notes as normal Markdown files, so you can switch between text editing and mind map editing without maintaining a separate mind map format.
 
-```text
-/Volumes/WORKSYSN/SynologyDrive/00-开发项目/mindmark
-```
+## Features
 
-The Obsidian runtime plugin lives at:
+- Create Markdown-backed mind map notes.
+- Open compatible Markdown files directly as mind maps.
+- Switch between MindMap view and Markdown view.
+- Edit nodes with keyboard shortcuts and double-click editing.
+- Add child nodes, sibling nodes, delete nodes, move nodes, and reorganize branches.
+- Use undo and redo while editing the mind map.
+- Render common Markdown formatting inside nodes, including bold, italic, highlight, strikethrough, inline code, links, and embeds.
+- Render and open Obsidian internal links from mind map nodes.
+- Show internal link previews on hover.
+- Use file suggestions while editing wikilinks with `[[`.
+- Drag nodes to change order and hierarchy.
+- Expand and collapse branches.
+- Use Focus Mode to highlight the selected branch.
+- Configure canvas size, background, font size, layout direction, branch colors, focus overlay opacity, and internal link behavior.
+- Import `.xmind` files by dragging them into the mind map.
+- Export mind maps to PNG, JPEG, and HTML.
 
-```text
-/Users/ian/Library/Mobile Documents/iCloud~md~obsidian/Documents/Obsidian/.obsidian/plugins/mindmark
-```
+## Markdown Format
 
-## Current Plugin Identity
-
-The active Obsidian plugin ID is:
-
-```text
-mindmark
-```
-
-The custom view type is:
-
-```text
-mindmapViewUpgraded
-```
-
-Do not confuse this project with the older plugin IDs or folders:
-
-- `obsidian-enhancing-mindmap`
-- `obsidian-enhancing-mindmap-upgraded`
-
-Those names come from the upstream project and earlier local experiments. The maintained local plugin is `mindmark`.
-
-## What It Does
-
-MindMark converts Markdown files with this frontmatter into an editable mind map:
+MindMark recognizes Markdown files with this frontmatter:
 
 ```markdown
 ---
@@ -45,70 +33,81 @@ mindmap-plugin: basic
 ---
 ```
 
-It supports a practical subset of Markdown:
+Headings and unordered lists are converted into the mind map structure:
 
-- Headings and unordered lists as mind map structure
-- Inline styles such as bold, italic, strikethrough, code, links, and embeds
-- Basic Obsidian internal links and hover previews
-- Export to image/HTML flows inherited from the original plugin
+```markdown
+# Project Plan
 
-The plugin is optimized for the user's Obsidian vault workflow, not for publishing as a generic community plugin at this stage.
+## Research
+- Collect references
+- Summarize findings
 
-## Main Commands
-
-Common command IDs are registered under `mindmark`:
-
-```text
-mindmark:Create New MindMap
-mindmark:Set to mindmap view
-mindmark:Set to markdown view
-mindmark:Toggle to markdown or mindmap
-mindmark:Insert child
-mindmark:Add sibling/end editing
-mindmark:Undo
-mindmark:Redo
-mindmark:Export to PNG
-mindmark:Export to JPEG
+## Execution
+- Draft outline
+- Review milestones
 ```
 
-Keyboard behavior in the mind map view includes:
+The file remains a Markdown file. MindMark serializes edits back to Markdown when the note is saved.
 
-- `Tab`: add child node
-- `Enter`: add sibling node
-- `Delete` / `Backspace`: delete selected node
-- `Space` / double-click: edit node
-- Arrow keys: navigate nodes
-- `F`: toggle focus mode on the selected node
-- `Esc`: exit focus mode or cancel editing
-- `Cmd/Ctrl + Z`: undo
-- `Cmd/Ctrl + Y`: redo
+## Commands
 
-Focus mode background darkness can be adjusted from 0% to 80% in the MindMark settings.
+MindMark registers these main commands:
 
-## Internal Link Settings
+- `Create New MindMap`
+- `Set to mindmap view`
+- `Set to markdown view`
+- `Toggle to markdown or mindmap`
+- `Insert child`
+- `Add sibling/end editing`
+- `Undo`
+- `Redo`
+- `Export to PNG`
+- `Export to JPEG`
+- `Export to HTML`
 
-MindMark provides two settings for Obsidian internal links rendered inside nodes:
+## Keyboard Shortcuts
 
-- **Enable internal link preview**: show the target note preview on hover. Enabled by default.
-- **Internal link open mode**: open links in the current tab, a new tab, or a new window. New window is the default.
+- `Tab`: add child node.
+- `Enter`: add sibling node or finish editing.
+- `Delete` / `Backspace`: delete selected node.
+- `Space` / double-click: edit selected node.
+- Arrow keys: navigate between nodes.
+- `Home`: select the root node.
+- `F`: toggle Focus Mode for the selected node.
+- `Esc`: exit Focus Mode or cancel editing.
+- `Cmd/Ctrl + Z`: undo.
+- `Cmd/Ctrl + Y`: redo.
+- `Cmd/Ctrl + mouse wheel`: zoom.
 
-## Project Structure
+## Installation
 
-```text
-src/main.ts                 Obsidian plugin entrypoint and command registration
-src/MindMapView.ts          Obsidian TextFileView wrapper for mind map files
-src/mindmap/mindmap.ts      Main runtime controller, events, layout refresh, focus mode
-src/mindmap/Layout.ts       Node placement and SVG edge drawing
-src/mindmap/INode.ts        Node DOM, editing, Markdown rendering, link/embed behavior
-src/mindmap/Execute.ts      Command dispatcher around undoable operations
-src/mindmap/Cmds.ts         Undo/redo command implementations
-src/mindmap/FileSuggest.ts  Obsidian file suggestion support for node editing
-src/utils.ts                Shared utilities such as uuid()
-styles.css                  Runtime plugin styling
-main.js                     Generated Rollup bundle loaded by Obsidian
-```
+### Community Plugin
 
-`main.js` is generated but intentionally committed because Obsidian loads the bundled plugin file directly.
+After MindMark is approved in the Obsidian community plugin directory:
+
+1. Open Obsidian Settings.
+2. Go to Community plugins.
+3. Search for `MindMark`.
+4. Install and enable the plugin.
+
+### Manual Installation
+
+1. Download `manifest.json`, `main.js`, and `styles.css` from a GitHub release.
+2. Create this folder in your vault: `.obsidian/plugins/mindmark`.
+3. Place the three downloaded files in that folder.
+4. Restart Obsidian or reload community plugins.
+5. Enable MindMark in Community plugins.
+
+## Desktop Support
+
+MindMark is currently published as a desktop-only plugin. The editing workflow uses desktop interactions such as keyboard navigation, drag and drop, hover preview, and Electron-based export capture.
+
+## Known Limitations
+
+- MindMark uses Markdown as its source format, not a separate binary mind map file format.
+- `.xmind` support is import-only.
+- HTML export creates a standalone HTML file containing an embedded exported image.
+- Very large mind maps can still take time to render, although the initial rendering pipeline has been optimized to reduce repeated layout work.
 
 ## Development
 
@@ -124,91 +123,22 @@ Build:
 npm run build
 ```
 
-The expected clean build output is:
+Generated runtime files:
 
-```text
-src/main.ts -> ....
-created . in ...
-```
+- `main.js`
+- `styles.css`
+- `manifest.json`
 
-There should be no TypeScript warnings and no Rollup circular dependency warnings.
+## Release Checklist
 
-## Deploy To The Local Obsidian Plugin
+Before creating a GitHub release:
 
-After building in this repo, copy the generated runtime files into the active Obsidian plugin directory:
+1. Update `manifest.json`, `package.json`, and `versions.json`.
+2. Run `npm run build`.
+3. Commit the source changes and generated `main.js`.
+4. Create a GitHub release whose tag matches the plugin version, for example `0.2.6`.
+5. Attach `manifest.json`, `main.js`, and `styles.css` to the release.
 
-```bash
-cp main.js styles.css "/Users/ian/Library/Mobile Documents/iCloud~md~obsidian/Documents/Obsidian/.obsidian/plugins/mindmark/"
-```
+## License
 
-Then reload the plugin:
-
-```bash
-obsidian plugin:reload id=mindmark
-```
-
-If the plugin is disabled:
-
-```bash
-obsidian plugin:enable id=mindmark filter=community
-obsidian plugin:reload id=mindmark
-```
-
-## Verification
-
-Open a known mind map file:
-
-```bash
-obsidian open path='00-INBOX/未命名思维导图.md'
-obsidian command id='mindmark:Set to mindmap view'
-```
-
-Check the workspace:
-
-```bash
-obsidian workspace
-```
-
-Expected active tab:
-
-```text
-[mindmapViewUpgraded] 未命名思维导图
-```
-
-Check runtime errors:
-
-```bash
-obsidian dev:errors
-```
-
-Expected:
-
-```text
-No errors captured.
-```
-
-Optional DOM sanity check:
-
-```bash
-obsidian eval code="JSON.stringify({mindmaps:document.querySelectorAll('.mm-mindmap').length,nodes:document.querySelectorAll('.mm-node').length,paths:document.querySelectorAll('.mm-mindmap svg path').length})"
-```
-
-Expected: at least one mind map, several nodes, and SVG paths when a mind map view is open.
-
-## Recent Important Fixes
-
-The current local changes include:
-
-- Focus mode now hides both out-of-scope nodes and their SVG edges.
-- `Layout` receives the active `MindMap` instance directly, avoiding `Cannot read properties of null (reading 'edgeGroup')` during resize/update.
-- `uuid()` was moved to `src/utils.ts` to remove runtime circular imports.
-- TypeScript warnings from older Obsidian type definitions were fixed with local compatibility casts.
-- `inlineSourceMap` was disabled to avoid Rollup sourcemap configuration warnings.
-
-## Notes For Future Work
-
-- Keep source edits in this repo, not inside the Obsidian runtime plugin folder.
-- Always build before copying `main.js` to the vault plugin folder.
-- If Obsidian reports old errors, clear the buffer with `obsidian dev:errors clear` before retesting.
-- The repository remote still points at the original upstream unless intentionally changed.
-- `node_modules` is local build state and should not be committed.
+MindMark is released under the MIT License. See [LICENSE.md](LICENSE.md).

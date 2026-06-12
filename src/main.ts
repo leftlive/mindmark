@@ -1388,15 +1388,19 @@ export default class MindMapPlugin extends Plugin {
 
           return function (state: ViewState, ...rest: any[]) {
             // new Notice( state.type);
+            const filePath = typeof state.state?.file === 'string'
+              ? state.state.file
+              : null;
+
             if (
               self._loaded &&
               state.type === "markdown" &&
-              state.state?.file &&
+              filePath &&
               // And the current mode of the file is not set to markdown
-              self.mindmapFileModes[this.id || state.state.file] !== "markdown"
+              self.mindmapFileModes[this.id || filePath] !== "markdown"
             ) {
               // Then check for the kanban frontMatterKey
-              const cache = self.app.metadataCache.getCache(state.state.file);
+              const cache = self.app.metadataCache.getCache(filePath);
 
               //   new Notice(cache.frontmatter[frontMatterKey]);
 
@@ -1407,7 +1411,7 @@ export default class MindMapPlugin extends Plugin {
                   type: mindmapViewType,
                 };
 
-                self.mindmapFileModes[state.state.file] = mindmapViewType;
+                self.mindmapFileModes[filePath] = mindmapViewType;
 
                 return next.apply(this, [newState, ...rest]);
               }

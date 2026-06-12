@@ -2,9 +2,10 @@
 	"id": "mindmark",
 	"name": "MindMark",
 	"version": "0.2.6",
-	"minAppVersion": "0.9.12",
-	"description": "A seamless markdown-based mindmap plugin for Obsidian. Visualize and edit your thoughts effortlessly.",
+	"minAppVersion": "1.5.0",
+	"description": "Edit Markdown files as visual mind maps in Obsidian.",
 	"author": "Ian Jin",
-	"authorUrl": "",
-	"isDesktopOnly": false
+	"authorUrl": "https://github.com/leftlive",
+	"fundingUrl": "",
+	"isDesktopOnly": true
 }
