@@ -85,6 +85,8 @@ Expected `activeType` is `mindmapViewUpgraded`.
 
 All focus-mode exit paths use `MindMap.exitFocusMode()`. It restores normal visibility, reselects the previously focused node, and centers that node instead of returning selection to the root.
 
+Focus overlay darkness is stored as `focusOverlayOpacity` from `0` to `0.8`. The settings slider displays it as 0% to 80%, and active focus views refresh immediately when it changes.
+
 ### Markdown view return button
 
 Mind map files displayed as Markdown have a `blocks` action beside the Markdown reading/editing mode button. `MindMapPlugin.updateMarkdownMindMapActions()` owns this button, shows it only when the file has `mindmap-plugin` frontmatter, and prevents duplicate actions across layout updates.

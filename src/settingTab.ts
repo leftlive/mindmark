@@ -182,6 +182,28 @@ export class MindMapSettingsTab extends PluginSettingTab {
             );
 
         new Setting(containerEl)
+            .setName(t('Focus overlay opacity'))
+            .setDesc(t('Focus overlay opacity desc'))
+            .addSlider((slider) =>
+                slider
+                    .setLimits(0, 80, 5)
+                    .setValue(Math.round(this.plugin.settings.focusOverlayOpacity * 100))
+                    .setDynamicTooltip()
+                    .onChange(async (value) => {
+                        this.plugin.settings.focusOverlayOpacity = value / 100;
+                        await this.plugin.saveSettings();
+                        this.app.workspace.getLeavesOfType(mindmapViewType).forEach((leaf) => {
+                            const view = leaf.view as MindMapView;
+                            view.mindmap.setting.focusOverlayOpacity =
+                                this.plugin.settings.focusOverlayOpacity;
+                            if (view.mindmap.focusedNode) {
+                                view.mindmap.refresh();
+                            }
+                        });
+                    }),
+            );
+
+        new Setting(containerEl)
             .setName(t('Enable internal link preview'))
             .setDesc(t('Enable internal link preview desc'))
             .addToggle((toggle) =>

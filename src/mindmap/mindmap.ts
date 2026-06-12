@@ -28,6 +28,7 @@ interface Setting {
     layoutDirect: string,
     strokeArray?:any[],
     focusOnMove?: boolean,
+    focusOverlayOpacity?: number,
     enableLinkPreview?: boolean,
     linkOpenMode?: 'current' | 'tab' | 'window'
 }
@@ -84,7 +85,8 @@ export default class MindMap {
             color: 'inherit',
             exportMdModel: 'default',
             headLevel: 1,
-            layoutDirect: ''
+            layoutDirect: '',
+            focusOverlayOpacity: 0.4
         }, setting || {});
 
 
@@ -2245,8 +2247,12 @@ export default class MindMap {
                 }
             }, this.root);
             
-            this.appEl.style.backgroundColor = 'rgba(0, 0, 0, 0.4)';
-            this.appEl.style.boxShadow = 'inset 0 0 150px rgba(0,0,0,0.5)';
+            const overlayOpacity = Math.min(
+                0.8,
+                Math.max(0, Number(this.setting.focusOverlayOpacity) || 0)
+            );
+            this.appEl.style.backgroundColor = `rgba(0, 0, 0, ${overlayOpacity})`;
+            this.appEl.style.boxShadow = `inset 0 0 150px rgba(0, 0, 0, ${overlayOpacity})`;
         } else {
             this.traverseBF((n: INode) => {
                 n.containEl.classList.remove('mm-node-dimmed');

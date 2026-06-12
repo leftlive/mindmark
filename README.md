@@ -83,6 +83,8 @@ Keyboard behavior in the mind map view includes:
 - `Cmd/Ctrl + Z`: undo
 - `Cmd/Ctrl + Y`: redo
 
+Focus mode background darkness can be adjusted from 0% to 80% in the MindMark settings.
+
 ## Internal Link Settings
 
 MindMark provides two settings for Obsidian internal links rendered inside nodes:

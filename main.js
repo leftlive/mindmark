@@ -140,6 +140,8 @@ var en = {
     "Clockwise": "Clockwise",
     "Stroke Array": "Stroke array",
     "Stroke Array Desc": "Node link color base on this value or random color",
+    "Focus overlay opacity": "Focus overlay opacity",
+    "Focus overlay opacity desc": "Adjust the darkness of the background overlay in focus mode",
     "Enable internal link preview": "Enable internal link preview",
     "Enable internal link preview desc": "Show a note preview when hovering over an internal link in a mindmap node",
     "Internal link open mode": "Internal link open mode",
@@ -361,6 +363,8 @@ var zhCN = {
     "Add brother node": "添加兄弟节点",
     "Stroke Array": "颜色组",
     "Stroke Array Desc": "节点连线颜色将按照颜色组生成,否则生成随机颜色",
+    "Focus overlay opacity": "Focus 模式遮罩透明度",
+    "Focus overlay opacity desc": "调整 Focus 模式下黑色背景遮罩的深浅",
     "Enable internal link preview": "启用双链预览",
     "Enable internal link preview desc": "鼠标悬停在思维导图节点中的双链上时显示笔记预览",
     "Internal link open mode": "双链点击打开方式",
@@ -8132,7 +8136,8 @@ class MindMap {
             color: 'inherit',
             exportMdModel: 'default',
             headLevel: 1,
-            layoutDirect: ''
+            layoutDirect: '',
+            focusOverlayOpacity: 0.4
         }, setting || {});
         this.data = data;
         this.view = view;
@@ -9862,8 +9867,9 @@ class MindMap {
                     n.containEl.style.pointerEvents = 'auto';
                 }
             }, this.root);
-            this.appEl.style.backgroundColor = 'rgba(0, 0, 0, 0.4)';
-            this.appEl.style.boxShadow = 'inset 0 0 150px rgba(0,0,0,0.5)';
+            const overlayOpacity = Math.min(0.8, Math.max(0, Number(this.setting.focusOverlayOpacity) || 0));
+            this.appEl.style.backgroundColor = `rgba(0, 0, 0, ${overlayOpacity})`;
+            this.appEl.style.boxShadow = `inset 0 0 150px rgba(0, 0, 0, ${overlayOpacity})`;
         }
         else {
             this.traverseBF((n) => {
@@ -39447,6 +39453,25 @@ class MindMapSettingsTab extends obsidian.PluginSettingTab {
             this.plugin.saveData(this.plugin.settings);
         }));
         new obsidian.Setting(containerEl)
+            .setName(t('Focus overlay opacity'))
+            .setDesc(t('Focus overlay opacity desc'))
+            .addSlider((slider) => slider
+            .setLimits(0, 80, 5)
+            .setValue(Math.round(this.plugin.settings.focusOverlayOpacity * 100))
+            .setDynamicTooltip()
+            .onChange((value) => __awaiter(this, void 0, void 0, function* () {
+            this.plugin.settings.focusOverlayOpacity = value / 100;
+            yield this.plugin.saveSettings();
+            this.app.workspace.getLeavesOfType(mindmapViewType).forEach((leaf) => {
+                const view = leaf.view;
+                view.mindmap.setting.focusOverlayOpacity =
+                    this.plugin.settings.focusOverlayOpacity;
+                if (view.mindmap.focusedNode) {
+                    view.mindmap.refresh();
+                }
+            });
+        })));
+        new obsidian.Setting(containerEl)
             .setName(t('Enable internal link preview'))
             .setDesc(t('Enable internal link preview desc'))
             .addToggle((toggle) => toggle
@@ -40580,6 +40605,7 @@ class MindMapPlugin extends obsidian.Plugin {
                 background: 'transparent',
                 layout: 'mindmap',
                 layoutDirect: 'mindmap',
+                focusOverlayOpacity: 0.4,
                 enableLinkPreview: true,
                 linkOpenMode: 'window'
             }, yield this.loadData());

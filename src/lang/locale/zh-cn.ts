@@ -43,6 +43,8 @@ export default {
 
   "Stroke Array":"颜色组",
   "Stroke Array Desc":"节点连线颜色将按照颜色组生成,否则生成随机颜色",
+  "Focus overlay opacity":"Focus 模式遮罩透明度",
+  "Focus overlay opacity desc":"调整 Focus 模式下黑色背景遮罩的深浅",
   "Enable internal link preview":"启用双链预览",
   "Enable internal link preview desc":"鼠标悬停在思维导图节点中的双链上时显示笔记预览",
   "Internal link open mode":"双链点击打开方式",

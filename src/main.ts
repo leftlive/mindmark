@@ -1233,6 +1233,7 @@ export default class MindMapPlugin extends Plugin {
       background: 'transparent',
       layout: 'mindmap',
       layoutDirect: 'mindmap',
+      focusOverlayOpacity: 0.4,
       enableLinkPreview: true,
       linkOpenMode: 'window'
     }, await this.loadData());

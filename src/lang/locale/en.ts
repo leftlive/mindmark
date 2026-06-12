@@ -33,6 +33,8 @@ export default {
 
     "Stroke Array":"Stroke array",
     "Stroke Array Desc":"Node link color base on this value or random color",
+    "Focus overlay opacity":"Focus overlay opacity",
+    "Focus overlay opacity desc":"Adjust the darkness of the background overlay in focus mode",
     "Enable internal link preview":"Enable internal link preview",
     "Enable internal link preview desc":"Show a note preview when hovering over an internal link in a mindmap node",
     "Internal link open mode":"Internal link open mode",

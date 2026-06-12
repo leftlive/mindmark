@@ -11,6 +11,7 @@ export class MindMapSettings {
     //strokeArray?:string=''
     strokeArray?:any[];
     focusOnMove:boolean;
+    focusOverlayOpacity:number = 0.4;
     enableLinkPreview:boolean = true;
     linkOpenMode:'current' | 'tab' | 'window' = 'window';
 }
