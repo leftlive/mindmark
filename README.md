@@ -1,8 +1,12 @@
+[中文说明](Readme-zh.md)
+
 # MindMark
 
 MindMark is an Obsidian plugin for editing Markdown files as visual mind maps.
 
 It keeps your notes as normal Markdown files, so you can switch between text editing and mind map editing without maintaining a separate mind map format.
+
+![MindMark overview](docs/screenshots/mindmark-showcase-overview.png)
 
 ## Features
 
@@ -22,6 +26,16 @@ It keeps your notes as normal Markdown files, so you can switch between text edi
 - Configure canvas size, background, font size, layout direction, branch colors, focus overlay opacity, and internal link behavior.
 - Import `.xmind` files by dragging them into the mind map.
 - Export mind maps to PNG, JPEG, and HTML.
+
+## Screenshots
+
+### Obsidian Knowledge Links
+
+![MindMark knowledge links](docs/screenshots/mindmark-showcase-links.png)
+
+### Share And Export
+
+![MindMark export](docs/screenshots/mindmark-showcase-export.png)
 
 ## Markdown Format
 
