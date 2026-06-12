@@ -21,8 +21,8 @@ export class MindMapSettingsTab extends PluginSettingTab {
         containerEl.empty();
 
         new Setting(containerEl)
-            .setName(`${t('Canvas size')}`)
-            .setDesc(`${t('Canvas size desc')}`)
+            .setName(t('Canvas size'))
+            .setDesc(t('Canvas size desc'))
             .addDropdown(dropDown =>
                 dropDown
                     .addOption('4000', '4000')
@@ -52,12 +52,12 @@ export class MindMapSettingsTab extends PluginSettingTab {
                     }));
 
         new Setting(containerEl)
-            .setName(`${t('Canvas background')}`)
-            .setDesc(`${t('Canvas background desc')}`)
+            .setName(t('Canvas background'))
+            .setDesc(t('Canvas background desc'))
             .addText(text =>
                 text
                     .setValue(this.plugin.settings.background || 'transparent')
-                    .setPlaceholder('Example: black|white|#ccc')
+                    .setPlaceholder(t('Canvas background placeholder'))
                     .onChange((value: string) => {
                         this.plugin.settings.background = value;
                         this.plugin.saveData(this.plugin.settings);
@@ -70,8 +70,8 @@ export class MindMapSettingsTab extends PluginSettingTab {
                     }));
 
         new Setting(containerEl)
-            .setName(`${t('Max level of node to markdown head')}`)
-            .setDesc(`${t('Max level of node to markdown head desc')}`)
+            .setName(t('Max level of node to markdown head'))
+            .setDesc(t('Max level of node to markdown head desc'))
             .addDropdown(dropDown =>
                 dropDown
                     .addOption('0', '0')
@@ -95,12 +95,12 @@ export class MindMapSettingsTab extends PluginSettingTab {
 
 
         new Setting(containerEl)
-            .setName(`${t('Font size')}`)
-            .setDesc(`${t('Font size desc')}`)
+            .setName(t('Font size'))
+            .setDesc(t('Font size desc'))
             .addText(text =>
                 text
                     .setValue(this.plugin.settings.fontSize?.toString() || '16')
-                    .setPlaceholder('Example: 16')
+                    .setPlaceholder(t('Font size placeholder'))
                     .onChange((value: string) => {
                         this.plugin.settings.fontSize = Number.parseInt(value);
                         this.plugin.saveData(this.plugin.settings);
@@ -118,8 +118,8 @@ export class MindMapSettingsTab extends PluginSettingTab {
                     }));
 
         new Setting(containerEl)
-            .setName(`${t('Mind map layout direct')}`)
-            .setDesc(`${t('Mind map layout direct desc')}`)
+            .setName(t('Mind map layout direct'))
+            .setDesc(t('Mind map layout direct desc'))
             .addDropdown(dropDown =>
                 dropDown
                     .addOption('mind map', t('Centered'))
@@ -139,31 +139,33 @@ export class MindMapSettingsTab extends PluginSettingTab {
                     }));
 
         const strokeSetting = new Setting(containerEl)
-            .setName(`${t('Stroke Array')}`)
-            .setDesc(`${t('Stroke Array Desc')}`);
+            .setName(t('Stroke Array'))
+            .setDesc(t('Stroke Array Desc'));
 
         const palettes = [
-            ['#e63946', '#f4a261', '#e9c46a', '#2a9d8f', '#264653'], // Classic
-            ['#cdb4db', '#ffc8dd', '#ffafcc', '#bde0fe', '#a2d2ff'], // Pastel
-            ['#ff595e', '#ffca3a', '#8ac926', '#1982c4', '#6a4c93'], // Rainbow
-            ['#03045e', '#0077b6', '#00b4d8', '#90e0ef', '#caf0f8'], // Ocean
-            ['#d8f3dc', '#b7e4c7', '#95d5b2', '#74c69d', '#52b788', '#40916c', '#2d6a4f', '#1b4332'], // Forest
-            ['#cb997e', '#ddbea9', '#ffe8d6', '#b7b7a4', '#a5a58d', '#6b705c'], // Earth
-            ['#22223b', '#4a4e69', '#9a8c98', '#c9ada7', '#f2e9e4'], // Vintage
+            { name: t('Classic palette'), colors: ['#e63946', '#f4a261', '#e9c46a', '#2a9d8f', '#264653'] },
+            { name: t('Pastel palette'), colors: ['#cdb4db', '#ffc8dd', '#ffafcc', '#bde0fe', '#a2d2ff'] },
+            { name: t('Bright palette'), colors: ['#ff595e', '#ffca3a', '#8ac926', '#1982c4', '#6a4c93'] },
+            { name: t('Ocean palette'), colors: ['#03045e', '#0077b6', '#00b4d8', '#90e0ef', '#caf0f8'] },
+            { name: t('Forest palette'), colors: ['#d8f3dc', '#b7e4c7', '#95d5b2', '#74c69d', '#52b788', '#40916c', '#2d6a4f', '#1b4332'] },
+            { name: t('Earth palette'), colors: ['#cb997e', '#ddbea9', '#ffe8d6', '#b7b7a4', '#a5a58d', '#6b705c'] },
+            { name: t('Vintage palette'), colors: ['#22223b', '#4a4e69', '#9a8c98', '#c9ada7', '#f2e9e4'] },
         ];
 
         const palettesDiv = strokeSetting.settingEl.createDiv('mm-color-palettes');
 
-        palettes.forEach((palette) => {
+        palettes.forEach(({ name, colors }) => {
             const paletteEl = palettesDiv.createDiv('mm-color-palette');
             const currentStroke = this.plugin.settings.strokeArray?.join(',') || '';
-            const isMatch = currentStroke === palette.join(',');
+            const isMatch = currentStroke === colors.join(',');
+            paletteEl.setAttribute('title', name);
+            paletteEl.setAttribute('aria-label', name);
 
             if (isMatch) {
                 paletteEl.classList.add('is-active');
             }
 
-            palette.forEach(color => {
+            colors.forEach(color => {
                 const block = paletteEl.createDiv('mm-color-block');
                 block.style.backgroundColor = color;
             });
@@ -174,7 +176,7 @@ export class MindMapSettingsTab extends PluginSettingTab {
                 paletteEl.classList.add('is-active');
 
                 // Save setting
-                this.plugin.settings.strokeArray = palette;
+                this.plugin.settings.strokeArray = colors;
                 this.plugin.saveData(this.plugin.settings);
 
                 // Update views
@@ -195,10 +197,8 @@ export class MindMapSettingsTab extends PluginSettingTab {
         });
 
         new Setting(containerEl)
-            .setName('Display moved on current node')
-            .setDesc(
-                'If enabled, the mindmap view is centered on the current node when moving it',
-            )
+            .setName(t('Center view after moving node'))
+            .setDesc(t('Center view after moving node desc'))
             .addToggle((toggle) =>
                 toggle
                     .setValue(this.plugin.settings.focusOnMove).onChange((value) => {

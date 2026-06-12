@@ -125,27 +125,38 @@ var en = {
     "Export to image": "Export to image",
     //setting
     "Canvas size": "Canvas size",
-    "Canvas size desc": "Width and height of the canvas",
+    "Canvas size desc": "Set the width and height of the mind map canvas in pixels",
     "Canvas background": "Canvas background",
-    "Canvas background desc": "Background color of canvas",
-    "Max level of node to markdown head": "Max level of node to create a Heading",
-    "Max level of node to markdown head desc": "Specify which Node Level creates a seperate Heading instead of a List-Item",
-    "Font size": "Font Size",
-    "Font size desc": "Specify the Font Size",
-    "Mind map layout direct": "Mindmap Layout",
-    "Mind map layout direct desc": "Specify the direction the nodes are placed in your Mindmap",
+    "Canvas background desc": "Set a CSS color for the canvas background, or use transparent",
+    "Canvas background placeholder": "For example: transparent, white, or #cccccc",
+    "Max level of node to markdown head": "Markdown heading depth",
+    "Max level of node to markdown head desc": "Choose how many top node levels are exported as Markdown headings. Select 0 to export every node as a list item",
+    "Font size": "Node font size",
+    "Font size desc": "Set the default node text size in pixels",
+    "Font size placeholder": "For example: 16",
+    "Mind map layout direct": "Mind map layout",
+    "Mind map layout direct desc": "Choose whether branches extend on both sides, one side, or clockwise",
     "Right": "Right",
     "Left": "Left",
-    "Centered": "Centered",
+    "Centered": "Both sides",
     "Clockwise": "Clockwise",
-    "Stroke Array": "Stroke array",
-    "Stroke Array Desc": "Node link color base on this value or random color",
-    "Focus overlay opacity": "Focus overlay opacity",
-    "Focus overlay opacity desc": "Adjust the darkness of the background overlay in focus mode",
-    "Enable internal link preview": "Enable internal link preview",
-    "Enable internal link preview desc": "Show a note preview when hovering over an internal link in a mindmap node",
-    "Internal link open mode": "Internal link open mode",
-    "Internal link open mode desc": "Choose where internal links open when clicked in a mindmap node",
+    "Stroke Array": "Branch color palette",
+    "Stroke Array Desc": "Choose the colors used for mind map branches",
+    "Classic palette": "Classic palette",
+    "Pastel palette": "Pastel palette",
+    "Bright palette": "Bright palette",
+    "Ocean palette": "Ocean palette",
+    "Forest palette": "Forest palette",
+    "Earth palette": "Earth palette",
+    "Vintage palette": "Vintage palette",
+    "Center view after moving node": "Center view after moving a node",
+    "Center view after moving node desc": "Center the mind map on the moved node after a move operation",
+    "Focus overlay opacity": "Focus mode overlay opacity",
+    "Focus overlay opacity desc": "Set the darkness of the black background overlay in focus mode",
+    "Enable internal link preview": "Preview internal links on hover",
+    "Enable internal link preview desc": "Show the target note preview when hovering over an internal link in a node",
+    "Internal link open mode": "Internal link click behavior",
+    "Internal link open mode desc": "Choose where the target note opens when an internal link is clicked",
     "Current tab": "Current tab",
     "New tab": "New tab",
     "New window": "New window",
@@ -338,15 +349,21 @@ var zhCN = {
     "Export to image": "导出至图片",
     //setting
     "Canvas size": "画布尺寸",
-    "Canvas size desc": "绘制思维导图画布的宽度和高度",
-    "Canvas background": "背景颜色",
-    "Canvas background desc": "画布的背景颜色",
-    "Max level of node to markdown head": "节点文字转为markdown标题的最大层级",
-    "Max level of node to markdown head desc": "将小于该层级的节点文字转为markdown标题，最大层级为6，因为HTML标题支持最大为6级",
-    "Font size": "文字大小",
-    "Font size desc": "思维导图文字默认大小，单位px",
+    "Canvas size desc": "设置思维导图画布的宽度和高度，单位为像素",
+    "Canvas background": "画布背景",
+    "Canvas background desc": "设置画布的 CSS 背景颜色，也可以填写 transparent",
+    "Canvas background placeholder": "例如：transparent、white 或 #cccccc",
+    "Max level of node to markdown head": "Markdown 标题层级",
+    "Max level of node to markdown head desc": "选择前几层节点导出为 Markdown 标题；选择 0 时所有节点均导出为列表项",
+    "Font size": "节点文字大小",
+    "Font size desc": "设置节点文字的默认大小，单位为像素",
+    "Font size placeholder": "例如：16",
     "Mind map layout direct": "思维导图布局方向",
-    "Mind map layout direct desc": "思维导图的布局方向，分为向两侧发散、仅右侧、仅左侧三个方向",
+    "Mind map layout direct desc": "选择分支向两侧、单侧或顺时针方向排列",
+    "Right": "仅右侧",
+    "Left": "仅左侧",
+    "Centered": "两侧分布",
+    "Clockwise": "顺时针",
     // wait to use
     "Expand node": "展开节点",
     "Collapse node": "收缩节点",
@@ -361,14 +378,23 @@ var zhCN = {
     "Only remove this node": "仅删除该节点",
     "Add child node": "添加子节点",
     "Add brother node": "添加兄弟节点",
-    "Stroke Array": "颜色组",
-    "Stroke Array Desc": "节点连线颜色将按照颜色组生成,否则生成随机颜色",
-    "Focus overlay opacity": "Focus 模式遮罩透明度",
-    "Focus overlay opacity desc": "调整 Focus 模式下黑色背景遮罩的深浅",
-    "Enable internal link preview": "启用双链预览",
-    "Enable internal link preview desc": "鼠标悬停在思维导图节点中的双链上时显示笔记预览",
-    "Internal link open mode": "双链点击打开方式",
-    "Internal link open mode desc": "选择点击思维导图节点中的双链后打开笔记的位置",
+    "Stroke Array": "分支配色方案",
+    "Stroke Array Desc": "选择思维导图分支和连线使用的颜色组合",
+    "Classic palette": "经典配色",
+    "Pastel palette": "柔和配色",
+    "Bright palette": "明亮配色",
+    "Ocean palette": "海洋配色",
+    "Forest palette": "森林配色",
+    "Earth palette": "大地配色",
+    "Vintage palette": "复古配色",
+    "Center view after moving node": "移动节点后居中",
+    "Center view after moving node desc": "移动节点后，将思维导图视图居中到该节点",
+    "Focus overlay opacity": "专注模式遮罩不透明度",
+    "Focus overlay opacity desc": "设置专注模式下黑色背景遮罩的深浅",
+    "Enable internal link preview": "悬停时预览双链",
+    "Enable internal link preview desc": "鼠标悬停在节点中的双链上时显示目标笔记预览",
+    "Internal link open mode": "双链点击行为",
+    "Internal link open mode desc": "选择点击双链时目标笔记的打开位置",
     "Current tab": "当前标签页",
     "New tab": "新标签页",
     "New window": "新窗口",
@@ -39386,8 +39412,8 @@ class MindMapSettingsTab extends obsidian.PluginSettingTab {
         const { containerEl } = this;
         containerEl.empty();
         new obsidian.Setting(containerEl)
-            .setName(`${t('Canvas size')}`)
-            .setDesc(`${t('Canvas size desc')}`)
+            .setName(t('Canvas size'))
+            .setDesc(t('Canvas size desc'))
             .addDropdown(dropDown => dropDown
             .addOption('4000', '4000')
             .addOption('6000', '6000')
@@ -39415,11 +39441,11 @@ class MindMapSettingsTab extends obsidian.PluginSettingTab {
             });
         }));
         new obsidian.Setting(containerEl)
-            .setName(`${t('Canvas background')}`)
-            .setDesc(`${t('Canvas background desc')}`)
+            .setName(t('Canvas background'))
+            .setDesc(t('Canvas background desc'))
             .addText(text => text
             .setValue(this.plugin.settings.background || 'transparent')
-            .setPlaceholder('Example: black|white|#ccc')
+            .setPlaceholder(t('Canvas background placeholder'))
             .onChange((value) => {
             this.plugin.settings.background = value;
             this.plugin.saveData(this.plugin.settings);
@@ -39431,8 +39457,8 @@ class MindMapSettingsTab extends obsidian.PluginSettingTab {
             });
         }));
         new obsidian.Setting(containerEl)
-            .setName(`${t('Max level of node to markdown head')}`)
-            .setDesc(`${t('Max level of node to markdown head desc')}`)
+            .setName(t('Max level of node to markdown head'))
+            .setDesc(t('Max level of node to markdown head desc'))
             .addDropdown(dropDown => dropDown
             .addOption('0', '0')
             .addOption('1', '1')
@@ -39452,13 +39478,13 @@ class MindMapSettingsTab extends obsidian.PluginSettingTab {
             });
         }));
         new obsidian.Setting(containerEl)
-            .setName(`${t('Font size')}`)
-            .setDesc(`${t('Font size desc')}`)
+            .setName(t('Font size'))
+            .setDesc(t('Font size desc'))
             .addText(text => {
             var _a;
             return text
                 .setValue(((_a = this.plugin.settings.fontSize) === null || _a === void 0 ? void 0 : _a.toString()) || '16')
-                .setPlaceholder('Example: 16')
+                .setPlaceholder(t('Font size placeholder'))
                 .onChange((value) => {
                 this.plugin.settings.fontSize = Number.parseInt(value);
                 this.plugin.saveData(this.plugin.settings);
@@ -39476,8 +39502,8 @@ class MindMapSettingsTab extends obsidian.PluginSettingTab {
             });
         });
         new obsidian.Setting(containerEl)
-            .setName(`${t('Mind map layout direct')}`)
-            .setDesc(`${t('Mind map layout direct desc')}`)
+            .setName(t('Mind map layout direct'))
+            .setDesc(t('Mind map layout direct desc'))
             .addDropdown(dropDown => dropDown
             .addOption('mind map', t('Centered'))
             .addOption('right', t('Right'))
@@ -39495,27 +39521,29 @@ class MindMapSettingsTab extends obsidian.PluginSettingTab {
             });
         }));
         const strokeSetting = new obsidian.Setting(containerEl)
-            .setName(`${t('Stroke Array')}`)
-            .setDesc(`${t('Stroke Array Desc')}`);
+            .setName(t('Stroke Array'))
+            .setDesc(t('Stroke Array Desc'));
         const palettes = [
-            ['#e63946', '#f4a261', '#e9c46a', '#2a9d8f', '#264653'],
-            ['#cdb4db', '#ffc8dd', '#ffafcc', '#bde0fe', '#a2d2ff'],
-            ['#ff595e', '#ffca3a', '#8ac926', '#1982c4', '#6a4c93'],
-            ['#03045e', '#0077b6', '#00b4d8', '#90e0ef', '#caf0f8'],
-            ['#d8f3dc', '#b7e4c7', '#95d5b2', '#74c69d', '#52b788', '#40916c', '#2d6a4f', '#1b4332'],
-            ['#cb997e', '#ddbea9', '#ffe8d6', '#b7b7a4', '#a5a58d', '#6b705c'],
-            ['#22223b', '#4a4e69', '#9a8c98', '#c9ada7', '#f2e9e4'], // Vintage
+            { name: t('Classic palette'), colors: ['#e63946', '#f4a261', '#e9c46a', '#2a9d8f', '#264653'] },
+            { name: t('Pastel palette'), colors: ['#cdb4db', '#ffc8dd', '#ffafcc', '#bde0fe', '#a2d2ff'] },
+            { name: t('Bright palette'), colors: ['#ff595e', '#ffca3a', '#8ac926', '#1982c4', '#6a4c93'] },
+            { name: t('Ocean palette'), colors: ['#03045e', '#0077b6', '#00b4d8', '#90e0ef', '#caf0f8'] },
+            { name: t('Forest palette'), colors: ['#d8f3dc', '#b7e4c7', '#95d5b2', '#74c69d', '#52b788', '#40916c', '#2d6a4f', '#1b4332'] },
+            { name: t('Earth palette'), colors: ['#cb997e', '#ddbea9', '#ffe8d6', '#b7b7a4', '#a5a58d', '#6b705c'] },
+            { name: t('Vintage palette'), colors: ['#22223b', '#4a4e69', '#9a8c98', '#c9ada7', '#f2e9e4'] },
         ];
         const palettesDiv = strokeSetting.settingEl.createDiv('mm-color-palettes');
-        palettes.forEach((palette) => {
+        palettes.forEach(({ name, colors }) => {
             var _a;
             const paletteEl = palettesDiv.createDiv('mm-color-palette');
             const currentStroke = ((_a = this.plugin.settings.strokeArray) === null || _a === void 0 ? void 0 : _a.join(',')) || '';
-            const isMatch = currentStroke === palette.join(',');
+            const isMatch = currentStroke === colors.join(',');
+            paletteEl.setAttribute('title', name);
+            paletteEl.setAttribute('aria-label', name);
             if (isMatch) {
                 paletteEl.classList.add('is-active');
             }
-            palette.forEach(color => {
+            colors.forEach(color => {
                 const block = paletteEl.createDiv('mm-color-block');
                 block.style.backgroundColor = color;
             });
@@ -39524,7 +39552,7 @@ class MindMapSettingsTab extends obsidian.PluginSettingTab {
                 palettesDiv.querySelectorAll('.mm-color-palette').forEach(el => el.classList.remove('is-active'));
                 paletteEl.classList.add('is-active');
                 // Save setting
-                this.plugin.settings.strokeArray = palette;
+                this.plugin.settings.strokeArray = colors;
                 this.plugin.saveData(this.plugin.settings);
                 // Update views
                 const mindmapLeaves = this.app.workspace.getLeavesOfType(mindmapViewType);
@@ -39543,8 +39571,8 @@ class MindMapSettingsTab extends obsidian.PluginSettingTab {
             };
         });
         new obsidian.Setting(containerEl)
-            .setName('Display moved on current node')
-            .setDesc('If enabled, the mindmap view is centered on the current node when moving it')
+            .setName(t('Center view after moving node'))
+            .setDesc(t('Center view after moving node desc'))
             .addToggle((toggle) => toggle
             .setValue(this.plugin.settings.focusOnMove).onChange((value) => {
             this.plugin.settings.focusOnMove = value;
