@@ -3,7 +3,7 @@ import Layout from './Layout'
 import { Notice, Platform } from 'obsidian'
 import SVG from 'svg.js'
 import type { MindMapView } from '../MindMapView'
-import { frontMatterKey, basicFrontmatter } from '../constants';
+import { frontMatterKey, basicFrontmatter, mindmapHoverSource } from '../constants';
 import Exec from './Execute'
 import {uuid} from '../utils'
 import { FileSuggest } from './FileSuggest'
@@ -1571,10 +1571,10 @@ export default class MindMap {
                 evt.stopPropagation();
                 var href = internalLink.getAttribute("data-href") || internalLink.getAttribute("href");
                 if (href) {
-                    this.view.app.workspace.openLinkText(
+                    (this.view.app.workspace as any).openLinkText(
                         href,
                         this.view.file.path,
-                        evt.ctrlKey || evt.metaKey
+                        "window"
                     );
                 }
                 return;
@@ -1878,7 +1878,7 @@ export default class MindMap {
             }
             this.view.app.workspace.trigger("hover-link", {
                 event: evt,
-                source: "preview",
+                source: mindmapHoverSource,
                 hoverParent: this.view,
                 targetEl: linkEl,
                 linktext,

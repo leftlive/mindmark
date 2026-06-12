@@ -400,6 +400,7 @@ function t(str) {
 
 const FRONT_MATTER_REGEX = /^(---)$.+?^(---)$.*?/ims;
 const frontMatterKey = 'mindmap-plugin';
+const mindmapHoverSource = 'mindmark';
 const basicFrontmatter = [
     "---",
     "",
@@ -478,33 +479,9 @@ class Node$1 {
         }
         obsidian.MarkdownRenderer.renderMarkdown(this.data.text, this.contentEl, this.mindmap.path || "", null).then(() => {
             this.data.mdText = this.contentEl.innerHTML;
-            this.registerInternalLinkHover();
             this.refreshBox();
             this.mindmap && this.mindmap.emit('initNode', {});
             this._delay();
-        });
-    }
-    registerInternalLinkHover() {
-        this.contentEl.querySelectorAll("a.internal-link").forEach((linkEl) => {
-            linkEl.addEventListener("mouseover", (evt) => {
-                var _a, _b, _c, _d, _e;
-                evt.stopPropagation();
-                const sourcePath = ((_c = (_b = (_a = this.mindmap) === null || _a === void 0 ? void 0 : _a.view) === null || _b === void 0 ? void 0 : _b.file) === null || _c === void 0 ? void 0 : _c.path) || ((_d = this.mindmap) === null || _d === void 0 ? void 0 : _d.path) || "";
-                const linktext = linkEl.getAttribute("data-href") ||
-                    linkEl.getAttribute("href") ||
-                    linkEl.innerText;
-                if (!sourcePath || !linktext || !((_e = this.mindmap) === null || _e === void 0 ? void 0 : _e.view)) {
-                    return;
-                }
-                this.mindmap.view.app.workspace.trigger("hover-link", {
-                    event: evt,
-                    source: "preview",
-                    hoverParent: this.mindmap.view,
-                    targetEl: linkEl,
-                    linktext,
-                    sourcePath,
-                });
-            });
         });
     }
     _delay() {
@@ -883,7 +860,6 @@ class Node$1 {
         this.contentEl.innerText = '';
         obsidian.MarkdownRenderer.renderMarkdown(text, this.contentEl, this.mindmap.path || "", null).then(() => {
             this.data.mdText = this.contentEl.innerHTML;
-            this.registerInternalLinkHover();
             this.refreshBox();
             this._delay();
         });
@@ -9272,7 +9248,7 @@ class MindMap {
                 evt.stopPropagation();
                 var href = internalLink.getAttribute("data-href") || internalLink.getAttribute("href");
                 if (href) {
-                    this.view.app.workspace.openLinkText(href, this.view.file.path, evt.ctrlKey || evt.metaKey);
+                    this.view.app.workspace.openLinkText(href, this.view.file.path, "window");
                 }
                 return;
             }
@@ -9548,7 +9524,7 @@ class MindMap {
             }
             this.view.app.workspace.trigger("hover-link", {
                 event: evt,
-                source: "preview",
+                source: mindmapHoverSource,
                 hoverParent: this.view,
                 targetEl: linkEl,
                 linktext,
@@ -39457,6 +39433,7 @@ class MindMapPlugin extends obsidian.Plugin {
     onload() {
         return __awaiter(this, void 0, void 0, function* () {
             yield this.loadSettings();
+            yield this.ensurePagePreviewEnabled();
             this.addCommand({
                 id: 'Create New MindMap',
                 name: `${t('Create new mindmap')}`,
@@ -40496,10 +40473,20 @@ class MindMapPlugin extends obsidian.Plugin {
             this.addSettingTab(new MindMapSettingsTab(this.app, this));
         });
     }
+    ensurePagePreviewEnabled() {
+        var _a;
+        return __awaiter(this, void 0, void 0, function* () {
+            const internalPlugins = this.app.internalPlugins;
+            const pagePreview = (_a = internalPlugins === null || internalPlugins === void 0 ? void 0 : internalPlugins.getPluginById) === null || _a === void 0 ? void 0 : _a.call(internalPlugins, "page-preview");
+            if (pagePreview && !pagePreview.enabled) {
+                yield pagePreview.enable(false);
+            }
+        });
+    }
     onunload() {
         var _a, _b;
         this.app.workspace.detachLeavesOfType(mindmapViewType);
-        (_b = (_a = this.app.workspace).unregisterHoverLinkSource) === null || _b === void 0 ? void 0 : _b.call(_a, mindmapViewType);
+        (_b = (_a = this.app.workspace).unregisterHoverLinkSource) === null || _b === void 0 ? void 0 : _b.call(_a, mindmapHoverSource);
     }
     newMindMap(folder) {
         var _a;
@@ -40598,9 +40585,9 @@ class MindMapPlugin extends obsidian.Plugin {
                 }
             });
         }));
-        (_b = (_a = this.app.workspace).registerHoverLinkSource) === null || _b === void 0 ? void 0 : _b.call(_a, mindmapViewType, {
-            display: 'Enhancing Mindmap',
-            defaultMod: true,
+        (_b = (_a = this.app.workspace).registerHoverLinkSource) === null || _b === void 0 ? void 0 : _b.call(_a, mindmapHoverSource, {
+            display: 'MindMark',
+            defaultMod: false,
         });
     }
     registerMonkeyAround() {

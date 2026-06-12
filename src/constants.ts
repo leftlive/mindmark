@@ -4,6 +4,7 @@ export const MD_VIEW_TYPE = 'markdown';
 export const FRONT_MATTER_REGEX = /^(---)$.+?^(---)$.*?/ims;
 
 export const frontMatterKey = 'mindmap-plugin';
+export const mindmapHoverSource = 'mindmark';
 
 
 export const basicFrontmatter = [
@@ -15,4 +16,3 @@ export const basicFrontmatter = [
   "",
   "",
 ].join("\n");
-

@@ -12,7 +12,7 @@ import { MindMapSettings } from './settings';
 import { MindMapSettingsTab } from './settingTab'
 
 import { MindMapView, mindmapViewType } from "./MindMapView";
-import { frontMatterKey, basicFrontmatter } from './constants';
+import { frontMatterKey, basicFrontmatter, mindmapHoverSource } from './constants';
 import { t } from './lang/helpers'
 
 
@@ -25,6 +25,7 @@ export default class MindMapPlugin extends Plugin {
   async onload() {
 
     await this.loadSettings();
+    await this.ensurePagePreviewEnabled();
 
     this.addCommand({
       id: 'Create New MindMap',
@@ -1170,10 +1171,19 @@ export default class MindMapPlugin extends Plugin {
 
   }
 
+  private async ensurePagePreviewEnabled() {
+    const internalPlugins = (this.app as any).internalPlugins;
+    const pagePreview = internalPlugins?.getPluginById?.("page-preview");
+
+    if (pagePreview && !pagePreview.enabled) {
+      await pagePreview.enable(false);
+    }
+  }
+
   onunload() {
 
     this.app.workspace.detachLeavesOfType(mindmapViewType);
-    (this.app.workspace as any).unregisterHoverLinkSource?.(mindmapViewType);
+    (this.app.workspace as any).unregisterHoverLinkSource?.(mindmapHoverSource);
 
   }
 
@@ -1285,9 +1295,9 @@ export default class MindMapPlugin extends Plugin {
       })
     );
 
-    (this.app.workspace as any).registerHoverLinkSource?.(mindmapViewType, {
-      display: 'Enhancing Mindmap',
-      defaultMod: true,
+    (this.app.workspace as any).registerHoverLinkSource?.(mindmapHoverSource, {
+      display: 'MindMark',
+      defaultMod: false,
     });
   }
 

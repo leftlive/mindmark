@@ -122,38 +122,11 @@ export default class Node {
         }
         MarkdownRenderer.renderMarkdown( this.data.text ,this.contentEl,this.mindmap.path||"",null).then(()=>{
             this.data.mdText = this.contentEl.innerHTML;
-            this.registerInternalLinkHover();
             this.refreshBox();
             this.mindmap&&this.mindmap.emit('initNode',{});
             this._delay();
         });
 
-    }
-
-    registerInternalLinkHover() {
-        this.contentEl.querySelectorAll("a.internal-link").forEach((linkEl: HTMLElement) => {
-            linkEl.addEventListener("mouseover", (evt: MouseEvent) => {
-                evt.stopPropagation();
-                const sourcePath = this.mindmap?.view?.file?.path || this.mindmap?.path || "";
-                const linktext =
-                    linkEl.getAttribute("data-href") ||
-                    linkEl.getAttribute("href") ||
-                    linkEl.innerText;
-
-                if (!sourcePath || !linktext || !this.mindmap?.view) {
-                    return;
-                }
-
-                this.mindmap.view.app.workspace.trigger("hover-link", {
-                    event: evt,
-                    source: "preview",
-                    hoverParent: this.mindmap.view,
-                    targetEl: linkEl,
-                    linktext,
-                    sourcePath,
-                });
-            });
-        });
     }
 
     _delay(){
@@ -585,7 +558,6 @@ export default class Node {
 
         MarkdownRenderer.renderMarkdown(text,this.contentEl,this.mindmap.path||"",null).then(()=>{
             this.data.mdText = this.contentEl.innerHTML;
-            this.registerInternalLinkHover();
             this.refreshBox();
             this._delay();
         });
