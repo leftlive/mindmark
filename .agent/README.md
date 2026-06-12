@@ -81,6 +81,14 @@ Expected `activeType` is `mindmapViewUpgraded`.
 
 ## Recent Bugs And Fixes
 
+### Collapsing hid edges but not child nodes
+
+Symptom: clicking a node's collapse dot removed its edges while child nodes remained visible.
+
+Fix location: `src/mindmap/mindmap.ts`
+
+Current rule: the layout pre-pass restores each node's DOM display from `INode.isShow()`. It must not force every node to `display: block`, because that overrides the state set by `INode.collapse()`.
+
 ### Internal link preview and opening behavior
 
 Settings:

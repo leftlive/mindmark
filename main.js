@@ -9832,10 +9832,9 @@ class MindMap {
             return;
         }
         var activeRoot = this.focusedNode || this.root;
-        // Ensure all nodes are display: block to maintain layout space
-        // and remove any previously added dimmed classes
+        // Restore each node's collapsed state before applying focus-mode styling.
         this.traverseBF((n) => {
-            n.containEl.style.display = 'block';
+            n.containEl.style.display = n.isShow() ? 'block' : 'none';
             n.containEl.classList.remove('mm-node-dimmed');
         }, this.root);
         // ALWAYS layout from this.root so the tree shape does not change
