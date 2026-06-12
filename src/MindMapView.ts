@@ -14,27 +14,21 @@ import { FRONT_MATTER_REGEX } from './constants'
 import MindMap from "./mindmap/mindmap";
 import { INodeData } from './mindmap/INode'
 import { Transformer } from './markmapLib/markmap-lib';
-import randomColor from "randomcolor";
 import { t } from './lang/helpers'
+import { uuid } from './utils'
 
 // import domtoimage from './domtoimage.js'
 import domtoimage from './dom-to-image-more.js'
 
-export function uuid(): string {
-  function S4() {
-    return (((1 + Math.random()) * 0x10000) | 0).toString(16).substring(1);
-  }
-  return (S4() + S4() + '-' + S4() + '-' + S4());
-}
 const transformer = new Transformer();
 
 
-export const mindmapViewType = "mindmapView";
+export const mindmapViewType = "mindmapViewUpgraded";
 export const mindmapIcon = "blocks";
 
 export class MindMapView extends TextFileView implements HoverParent {
   plugin: MindMapPlugin;
-  hoverPopover: HoverPopover | null;
+  hoverPopover: HoverPopover | null = null;
   id: string = (this.leaf as any).id;
   mindmap: MindMap | null;
   colors: string[] = [];
@@ -67,9 +61,7 @@ export class MindMapView extends TextFileView implements HoverParent {
 
     this.colors = this.colors.concat(colors);
 
-    for (var i = 0; i < 50; i++) {
-      this.colors.push(randomColor());
-    }
+    // We no longer add 50 random colors. Layout.ts now uses CSS variable defined theme palettes.
   }
 
   exportToSvg(){
@@ -117,14 +109,14 @@ export class MindMapView extends TextFileView implements HoverParent {
         img.src = dataUrl;
         var str = img.outerHTML;
 
-         var p= this.mindmap.path.substr(0,this.mindmap.path.length-2);
+        const fileName = this.mindmap.path.replace(/\.md$/, '.html');
         try{
-          new Notice(p+'html');
-          this.app.vault.adapter.write(p+'html', str);
+          new Notice(`Mindmap exported as HTML: ${fileName}`);
+          this.app.vault.adapter.write(fileName, str);
           this.restoreMindmap(rootBox,oldScrollLeft,oldScrollTop)
         }catch(err){
           this.restoreMindmap(rootBox,oldScrollLeft,oldScrollTop)
-          new Notice(err);
+          new Notice(`Failed to export mindmap: ${err}`);
         }
 
       }).catch(err=>{
@@ -376,7 +368,7 @@ export class MindMapView extends TextFileView implements HoverParent {
     //   });
     // }
 
-    this.mindmap = new MindMap(mindData, this.contentEl, this.plugin.settings);
+    this.mindmap = new MindMap(mindData, this.contentEl, this.plugin.settings, this);
     this.mindmap.colors = this.colors;
     if (this.firstInit) {
 
@@ -394,6 +386,19 @@ export class MindMapView extends TextFileView implements HoverParent {
         this.mindmap.init();
         this.mindmap.refresh();
         this.mindmap.view = this;
+        
+        // Auto-edit root node if the mindmap is completely new
+        if (mdText.trim() === "") {
+           setTimeout(() => {
+               if (this.mindmap && this.mindmap.root) {
+                   if (this.leaf) {
+                       this.app.workspace.setActiveLeaf(this.leaf, false, true);
+                   }
+                   this.mindmap.root.edit();
+               }
+           }, 600);
+        }
+        
         this.firstInit = false;
       }, 100);
     } else {
@@ -409,8 +414,6 @@ export class MindMapView extends TextFileView implements HoverParent {
   }
 
   onunload() {
-    this.app.workspace.offref("quick-preview");
-    this.app.workspace.offref("resize");
 
     if (this.mindmap) {
       this.mindmap.clear();
@@ -426,11 +429,43 @@ export class MindMapView extends TextFileView implements HoverParent {
   onload() {
     super.onload();
     this.registerEvent(
-      this.app.workspace.on("quick-preview", () => this.onQuickPreview, this)
+      this.app.workspace.on("quick-preview", this.onQuickPreview, this)
     );
-//    this.registerEvent(
-//      this.app.workspace.on('resize', () => this.updateMindMap(), this)
-//    );
+    this.registerEvent(
+      this.app.workspace.on('active-leaf-change', (leaf) => {
+        if (leaf === this.leaf) {
+            setTimeout(() => this.updateMindMap(), 100);
+        }
+      })
+    );
+
+    // 增加切换回 Markdown 的快捷按钮
+    this.addAction("document", t("Open as markdown"), () => {
+      this.plugin.mindmapFileModes[this.id || this.file.path] = "markdown";
+      this.plugin.setMarkdownView(this.leaf);
+    });
+
+    // 增加向右分屏并以 Markdown 展示的快捷按钮 (Toggle 模式)
+    this.addAction("sidebar-right", "Toggle split right (Markdown)", () => {
+      // 查找当前工作区中是否已经有显示该文件的 markdown 视图
+      const leaves = this.app.workspace.getLeavesOfType("markdown");
+      const existingLeaf = leaves.find(l => {
+         const view = l.view as any;
+         return view.file && view.file.path === this.file.path;
+      });
+
+      if (existingLeaf) {
+        // 如果已经存在，则将其关闭（取消分屏）
+        existingLeaf.detach();
+      } else {
+        // 否则，创建一个新的右侧分屏叶子
+        const newLeaf = (this.app.workspace as any).getLeaf("split", "vertical") as WorkspaceLeaf;
+        // 标记这个新叶子需要以 Markdown 模式打开，避免被插件再次拦截为导图
+        this.plugin.mindmapFileModes[(newLeaf as any).id || this.file.path] = "markdown";
+        // 在新叶子中打开当前文件
+        newLeaf.openFile(this.file, { active: true });
+      }
+    });
   }
 
   onQuickPreview(file: TFile, data: string) {
@@ -441,11 +476,17 @@ export class MindMapView extends TextFileView implements HoverParent {
   }
 
   updateMindMap() {
-    if (this.mindmap) {
+    if (this.mindmap && this.contentEl && this.contentEl.clientWidth > 0) {
+      this.mindmap.refresh();
       if(Platform.isDesktopApp){
         this.mindmap.center();
       }
     }
+  }
+
+  onResize() {
+    super.onResize();
+    this.updateMindMap();
   }
 
   async onFileMetadataChange(file: TFile) {
@@ -467,14 +508,15 @@ export class MindMapView extends TextFileView implements HoverParent {
         flag = false;
         mapData.v = '> ' + mapData.v;
       }
-      const regexResult = /^.+ \^([a-z0-9\-]+)$/gim.exec(mapData.v);
+      const regexResult = /^.+ \^([a-z0-9\-]+)$/im.exec(mapData.v);
       const id = regexResult != null ? regexResult[1] : null
 
      // console.log(id);
 
+      var rawText = id ? mapData.v.replace(` ^${id}`, '') : mapData.v;
       var map: INodeData = {
         id: id || uuid(),
-        text: id ? mapData.v.replace(` ^${id}`, '') : mapData.v,
+        text: rawText.replace(/<br>/g, '\n'),
         children: [],
         expanded: id ? false:true
       };
@@ -531,7 +573,8 @@ export class MindMapView extends TextFileView implements HoverParent {
 
     // })
 
-    super.onPaneMenu(menu,'more-options');
+    const parentView = Object.getPrototypeOf(MindMapView.prototype);
+    parentView.onPaneMenu?.call(this, menu, 'more-options');
   }
 
 }

@@ -179,6 +179,8 @@ var en = {
     'Join as citation with the node below': 'Join as citation with the node below',
     'Center mindmap view on the current node': 'Center mindmap view on the current node',
     'Center mindmap view': 'Center mindmap view',
+    'Zoom in': 'Zoom in',
+    'Zoom out': 'Zoom out',
     'Display the node\'s info in console': 'Display the node\'s info in console',
     "Export to html": "Export to html",
     "Export to PNG": "Export to PNG",
@@ -396,7 +398,7 @@ function t(str) {
     return (locale && locale[str]) || en[str];
 }
 
-const FRONT_MATTER_REGEX = /^(---)$.+?^(---)$.+?/ims;
+const FRONT_MATTER_REGEX = /^(---)$.+?^(---)$.*?/ims;
 const frontMatterKey = 'mindmap-plugin';
 const basicFrontmatter = [
     "---",
@@ -435,7 +437,6 @@ class Node$1 {
         //isRoot?:boolean;
         this.children = [];
         this.isHide = false;
-        //isEdit:boolean=false;
         this._barDom = null;
         this.data = data;
         this.mindmap = mindMap;
@@ -473,13 +474,37 @@ class Node$1 {
     }
     parseText() {
         if (this.data.text.length === 0) {
-            this.data.text = "Sub title";
+            this.data.text = t("Sub title");
         }
         obsidian.MarkdownRenderer.renderMarkdown(this.data.text, this.contentEl, this.mindmap.path || "", null).then(() => {
             this.data.mdText = this.contentEl.innerHTML;
+            this.registerInternalLinkHover();
             this.refreshBox();
             this.mindmap && this.mindmap.emit('initNode', {});
             this._delay();
+        });
+    }
+    registerInternalLinkHover() {
+        this.contentEl.querySelectorAll("a.internal-link").forEach((linkEl) => {
+            linkEl.addEventListener("mouseover", (evt) => {
+                var _a, _b, _c, _d, _e;
+                evt.stopPropagation();
+                const sourcePath = ((_c = (_b = (_a = this.mindmap) === null || _a === void 0 ? void 0 : _a.view) === null || _b === void 0 ? void 0 : _b.file) === null || _c === void 0 ? void 0 : _c.path) || ((_d = this.mindmap) === null || _d === void 0 ? void 0 : _d.path) || "";
+                const linktext = linkEl.getAttribute("data-href") ||
+                    linkEl.getAttribute("href") ||
+                    linkEl.innerText;
+                if (!sourcePath || !linktext || !((_e = this.mindmap) === null || _e === void 0 ? void 0 : _e.view)) {
+                    return;
+                }
+                this.mindmap.view.app.workspace.trigger("hover-link", {
+                    event: evt,
+                    source: "preview",
+                    hoverParent: this.mindmap.view,
+                    targetEl: linkEl,
+                    linktext,
+                    sourcePath,
+                });
+            });
         });
     }
     _delay() {
@@ -624,6 +649,44 @@ class Node$1 {
         if (!this.containEl.classList.contains('mm-edit-node')) {
             this.containEl.classList.add('mm-edit-node');
         }
+        if (!this._inputHandler) {
+            this._inputHandler = (e) => {
+                if (!this.mindmap.fileSuggest)
+                    return;
+                this.contentEl.innerText;
+                const selection = window.getSelection();
+                if (selection && selection.rangeCount > 0) {
+                    const range = selection.getRangeAt(0);
+                    const preCursorRange = range.cloneRange();
+                    preCursorRange.selectNodeContents(this.contentEl);
+                    preCursorRange.setEnd(range.endContainer, range.endOffset);
+                    const textBeforeCursor = preCursorRange.toString();
+                    const matchIndex = textBeforeCursor.lastIndexOf('[[');
+                    if (matchIndex !== -1) {
+                        const query = textBeforeCursor.substring(matchIndex + 2);
+                        const closingIndex = textBeforeCursor.indexOf(']]', matchIndex);
+                        if (closingIndex === -1) {
+                            const rect = range.getBoundingClientRect();
+                            this.mindmap.fileSuggest.open(this, rect, query);
+                            return;
+                        }
+                    }
+                }
+                this.mindmap.fileSuggest.close();
+            };
+        }
+        if (!this._keydownHandler) {
+            this._keydownHandler = (e) => {
+                var _a;
+                if ((_a = this.mindmap.fileSuggest) === null || _a === void 0 ? void 0 : _a.isOpen) {
+                    if (this.mindmap.fileSuggest.handleKeydown(e)) {
+                        return;
+                    }
+                }
+            };
+        }
+        this.contentEl.addEventListener('input', this._inputHandler);
+        this.contentEl.addEventListener('keydown', this._keydownHandler);
     }
     selectText() {
         var text = this.contentEl;
@@ -804,6 +867,13 @@ class Node$1 {
         //selection.removeAllRanges();
     }
     cancelEdit() {
+        var _a;
+        if (!this.data.isEdit)
+            return;
+        (_a = this.mindmap.fileSuggest) === null || _a === void 0 ? void 0 : _a.close();
+        this.contentEl.removeEventListener('input', this._inputHandler);
+        this.contentEl.removeEventListener('keydown', this._keydownHandler);
+        this.contentEl.removeAttribute('contentEditable');
         console.log("CancelEdit");
         var text = this.contentEl.innerText.trim() || '';
         if (text.length == 0) {
@@ -813,6 +883,7 @@ class Node$1 {
         this.contentEl.innerText = '';
         obsidian.MarkdownRenderer.renderMarkdown(text, this.contentEl, this.mindmap.path || "", null).then(() => {
             this.data.mdText = this.contentEl.innerHTML;
+            this.registerInternalLinkHover();
             this.refreshBox();
             this._delay();
         });
@@ -823,7 +894,7 @@ class Node$1 {
                 oldText: this._oldText
             });
         }
-        this.contentEl.setAttribute('contentEditable', 'false');
+        this.contentEl.removeAttribute('contentEditable');
         this.data.isEdit = false;
         if (this.containEl.classList.contains('mm-edit-node')) {
             this.containEl.classList.remove('mm-edit-node');
@@ -1083,533 +1154,9 @@ class Node$1 {
     }
 }
 
-var commonjsGlobal = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};
-
-function createCommonjsModule(fn) {
-  var module = { exports: {} };
-	return fn(module, module.exports), module.exports;
-}
-
-function commonjsRequire (path) {
-	throw new Error('Could not dynamically require "' + path + '". Please configure the dynamicRequireTargets or/and ignoreDynamicRequires option of @rollup/plugin-commonjs appropriately for this require call to work.');
-}
-
-var randomColor = createCommonjsModule(function (module, exports) {
-(function(root, factory) {
-
-  // Support CommonJS
-  {
-    var randomColor = factory();
-
-    // Support NodeJS & Component, which allow module.exports to be a function
-    if (module && module.exports) {
-      exports = module.exports = randomColor;
-    }
-
-    // Support CommonJS 1.1.1 spec
-    exports.randomColor = randomColor;
-
-  // Support AMD
-  }
-
-}(commonjsGlobal, function() {
-
-  // Seed to get repeatable colors
-  var seed = null;
-
-  // Shared color dictionary
-  var colorDictionary = {};
-
-  // Populate the color dictionary
-  loadColorBounds();
-
-  // check if a range is taken
-  var colorRanges = [];
-
-  var randomColor = function (options) {
-
-    options = options || {};
-
-    // Check if there is a seed and ensure it's an
-    // integer. Otherwise, reset the seed value.
-    if (options.seed !== undefined && options.seed !== null && options.seed === parseInt(options.seed, 10)) {
-      seed = options.seed;
-
-    // A string was passed as a seed
-    } else if (typeof options.seed === 'string') {
-      seed = stringToInteger(options.seed);
-
-    // Something was passed as a seed but it wasn't an integer or string
-    } else if (options.seed !== undefined && options.seed !== null) {
-      throw new TypeError('The seed value must be an integer or string');
-
-    // No seed, reset the value outside.
-    } else {
-      seed = null;
-    }
-
-    var H,S,B;
-
-    // Check if we need to generate multiple colors
-    if (options.count !== null && options.count !== undefined) {
-
-      var totalColors = options.count,
-          colors = [];
-      // Value false at index i means the range i is not taken yet.
-      for (var i = 0; i < options.count; i++) {
-        colorRanges.push(false);
-        }
-      options.count = null;
-
-      while (totalColors > colors.length) {
-
-        var color = randomColor(options);
-
-        if (seed !== null) {
-          options.seed = seed;
-        }
-
-        colors.push(color);
-      }
-
-      options.count = totalColors;
-
-      return colors;
-    }
-
-    // First we pick a hue (H)
-    H = pickHue(options);
-
-    // Then use H to determine saturation (S)
-    S = pickSaturation(H, options);
-
-    // Then use S and H to determine brightness (B).
-    B = pickBrightness(H, S, options);
-
-    // Then we return the HSB color in the desired format
-    return setFormat([H,S,B], options);
-  };
-
-  function pickHue(options) {
-    if (colorRanges.length > 0) {
-      var hueRange = getRealHueRange(options.hue);
-
-      var hue = randomWithin(hueRange);
-
-      //Each of colorRanges.length ranges has a length equal approximatelly one step
-      var step = (hueRange[1] - hueRange[0]) / colorRanges.length;
-
-      var j = parseInt((hue - hueRange[0]) / step);
-
-      //Check if the range j is taken
-      if (colorRanges[j] === true) {
-        j = (j + 2) % colorRanges.length;
-      }
-      else {
-        colorRanges[j] = true;
-           }
-
-      var min = (hueRange[0] + j * step) % 359,
-          max = (hueRange[0] + (j + 1) * step) % 359;
-
-      hueRange = [min, max];
-
-      hue = randomWithin(hueRange);
-
-      if (hue < 0) {hue = 360 + hue;}
-      return hue
-    }
-    else {
-      var hueRange = getHueRange(options.hue);
-
-      hue = randomWithin(hueRange);
-      // Instead of storing red as two seperate ranges,
-      // we group them, using negative numbers
-      if (hue < 0) {
-        hue = 360 + hue;
-      }
-
-      return hue;
-    }
-  }
-
-  function pickSaturation (hue, options) {
-
-    if (options.hue === 'monochrome') {
-      return 0;
-    }
-
-    if (options.luminosity === 'random') {
-      return randomWithin([0,100]);
-    }
-
-    var saturationRange = getSaturationRange(hue);
-
-    var sMin = saturationRange[0],
-        sMax = saturationRange[1];
-
-    switch (options.luminosity) {
-
-      case 'bright':
-        sMin = 55;
-        break;
-
-      case 'dark':
-        sMin = sMax - 10;
-        break;
-
-      case 'light':
-        sMax = 55;
-        break;
-   }
-
-    return randomWithin([sMin, sMax]);
-
-  }
-
-  function pickBrightness (H, S, options) {
-
-    var bMin = getMinimumBrightness(H, S),
-        bMax = 100;
-
-    switch (options.luminosity) {
-
-      case 'dark':
-        bMax = bMin + 20;
-        break;
-
-      case 'light':
-        bMin = (bMax + bMin)/2;
-        break;
-
-      case 'random':
-        bMin = 0;
-        bMax = 100;
-        break;
-    }
-
-    return randomWithin([bMin, bMax]);
-  }
-
-  function setFormat (hsv, options) {
-
-    switch (options.format) {
-
-      case 'hsvArray':
-        return hsv;
-
-      case 'hslArray':
-        return HSVtoHSL(hsv);
-
-      case 'hsl':
-        var hsl = HSVtoHSL(hsv);
-        return 'hsl('+hsl[0]+', '+hsl[1]+'%, '+hsl[2]+'%)';
-
-      case 'hsla':
-        var hslColor = HSVtoHSL(hsv);
-        var alpha = options.alpha || Math.random();
-        return 'hsla('+hslColor[0]+', '+hslColor[1]+'%, '+hslColor[2]+'%, ' + alpha + ')';
-
-      case 'rgbArray':
-        return HSVtoRGB(hsv);
-
-      case 'rgb':
-        var rgb = HSVtoRGB(hsv);
-        return 'rgb(' + rgb.join(', ') + ')';
-
-      case 'rgba':
-        var rgbColor = HSVtoRGB(hsv);
-        var alpha = options.alpha || Math.random();
-        return 'rgba(' + rgbColor.join(', ') + ', ' + alpha + ')';
-
-      default:
-        return HSVtoHex(hsv);
-    }
-
-  }
-
-  function getMinimumBrightness(H, S) {
-
-    var lowerBounds = getColorInfo(H).lowerBounds;
-
-    for (var i = 0; i < lowerBounds.length - 1; i++) {
-
-      var s1 = lowerBounds[i][0],
-          v1 = lowerBounds[i][1];
-
-      var s2 = lowerBounds[i+1][0],
-          v2 = lowerBounds[i+1][1];
-
-      if (S >= s1 && S <= s2) {
-
-         var m = (v2 - v1)/(s2 - s1),
-             b = v1 - m*s1;
-
-         return m*S + b;
-      }
-
-    }
-
-    return 0;
-  }
-
-  function getHueRange (colorInput) {
-
-    if (typeof parseInt(colorInput) === 'number') {
-
-      var number = parseInt(colorInput);
-
-      if (number < 360 && number > 0) {
-        return [number, number];
-      }
-
-    }
-
-    if (typeof colorInput === 'string') {
-
-      if (colorDictionary[colorInput]) {
-        var color = colorDictionary[colorInput];
-        if (color.hueRange) {return color.hueRange;}
-      } else if (colorInput.match(/^#?([0-9A-F]{3}|[0-9A-F]{6})$/i)) {
-        var hue = HexToHSB(colorInput)[0];
-        return [ hue, hue ];
-      }
-    }
-
-    return [0,360];
-
-  }
-
-  function getSaturationRange (hue) {
-    return getColorInfo(hue).saturationRange;
-  }
-
-  function getColorInfo (hue) {
-
-    // Maps red colors to make picking hue easier
-    if (hue >= 334 && hue <= 360) {
-      hue-= 360;
-    }
-
-    for (var colorName in colorDictionary) {
-       var color = colorDictionary[colorName];
-       if (color.hueRange &&
-           hue >= color.hueRange[0] &&
-           hue <= color.hueRange[1]) {
-          return colorDictionary[colorName];
-       }
-    } return 'Color not found';
-  }
-
-  function randomWithin (range) {
-    if (seed === null) {
-      //generate random evenly destinct number from : https://martin.ankerl.com/2009/12/09/how-to-create-random-colors-programmatically/
-      var golden_ratio = 0.618033988749895;
-      var r=Math.random();
-      r += golden_ratio;
-      r %= 1;
-      return Math.floor(range[0] + r*(range[1] + 1 - range[0]));
-    } else {
-      //Seeded random algorithm from http://indiegamr.com/generate-repeatable-random-numbers-in-js/
-      var max = range[1] || 1;
-      var min = range[0] || 0;
-      seed = (seed * 9301 + 49297) % 233280;
-      var rnd = seed / 233280.0;
-      return Math.floor(min + rnd * (max - min));
-}
-  }
-
-  function HSVtoHex (hsv){
-
-    var rgb = HSVtoRGB(hsv);
-
-    function componentToHex(c) {
-        var hex = c.toString(16);
-        return hex.length == 1 ? '0' + hex : hex;
-    }
-
-    var hex = '#' + componentToHex(rgb[0]) + componentToHex(rgb[1]) + componentToHex(rgb[2]);
-
-    return hex;
-
-  }
-
-  function defineColor (name, hueRange, lowerBounds) {
-
-    var sMin = lowerBounds[0][0],
-        sMax = lowerBounds[lowerBounds.length - 1][0],
-
-        bMin = lowerBounds[lowerBounds.length - 1][1],
-        bMax = lowerBounds[0][1];
-
-    colorDictionary[name] = {
-      hueRange: hueRange,
-      lowerBounds: lowerBounds,
-      saturationRange: [sMin, sMax],
-      brightnessRange: [bMin, bMax]
-    };
-
-  }
-
-  function loadColorBounds () {
-
-    defineColor(
-      'monochrome',
-      null,
-      [[0,0],[100,0]]
-    );
-
-    defineColor(
-      'red',
-      [-26,18],
-      [[20,100],[30,92],[40,89],[50,85],[60,78],[70,70],[80,60],[90,55],[100,50]]
-    );
-
-    defineColor(
-      'orange',
-      [18,46],
-      [[20,100],[30,93],[40,88],[50,86],[60,85],[70,70],[100,70]]
-    );
-
-    defineColor(
-      'yellow',
-      [46,62],
-      [[25,100],[40,94],[50,89],[60,86],[70,84],[80,82],[90,80],[100,75]]
-    );
-
-    defineColor(
-      'green',
-      [62,178],
-      [[30,100],[40,90],[50,85],[60,81],[70,74],[80,64],[90,50],[100,40]]
-    );
-
-    defineColor(
-      'blue',
-      [178, 257],
-      [[20,100],[30,86],[40,80],[50,74],[60,60],[70,52],[80,44],[90,39],[100,35]]
-    );
-
-    defineColor(
-      'purple',
-      [257, 282],
-      [[20,100],[30,87],[40,79],[50,70],[60,65],[70,59],[80,52],[90,45],[100,42]]
-    );
-
-    defineColor(
-      'pink',
-      [282, 334],
-      [[20,100],[30,90],[40,86],[60,84],[80,80],[90,75],[100,73]]
-    );
-
-  }
-
-  function HSVtoRGB (hsv) {
-
-    // this doesn't work for the values of 0 and 360
-    // here's the hacky fix
-    var h = hsv[0];
-    if (h === 0) {h = 1;}
-    if (h === 360) {h = 359;}
-
-    // Rebase the h,s,v values
-    h = h/360;
-    var s = hsv[1]/100,
-        v = hsv[2]/100;
-
-    var h_i = Math.floor(h*6),
-      f = h * 6 - h_i,
-      p = v * (1 - s),
-      q = v * (1 - f*s),
-      t = v * (1 - (1 - f)*s),
-      r = 256,
-      g = 256,
-      b = 256;
-
-    switch(h_i) {
-      case 0: r = v; g = t; b = p;  break;
-      case 1: r = q; g = v; b = p;  break;
-      case 2: r = p; g = v; b = t;  break;
-      case 3: r = p; g = q; b = v;  break;
-      case 4: r = t; g = p; b = v;  break;
-      case 5: r = v; g = p; b = q;  break;
-    }
-
-    var result = [Math.floor(r*255), Math.floor(g*255), Math.floor(b*255)];
-    return result;
-  }
-
-  function HexToHSB (hex) {
-    hex = hex.replace(/^#/, '');
-    hex = hex.length === 3 ? hex.replace(/(.)/g, '$1$1') : hex;
-
-    var red = parseInt(hex.substr(0, 2), 16) / 255,
-          green = parseInt(hex.substr(2, 2), 16) / 255,
-          blue = parseInt(hex.substr(4, 2), 16) / 255;
-
-    var cMax = Math.max(red, green, blue),
-          delta = cMax - Math.min(red, green, blue),
-          saturation = cMax ? (delta / cMax) : 0;
-
-    switch (cMax) {
-      case red: return [ 60 * (((green - blue) / delta) % 6) || 0, saturation, cMax ];
-      case green: return [ 60 * (((blue - red) / delta) + 2) || 0, saturation, cMax ];
-      case blue: return [ 60 * (((red - green) / delta) + 4) || 0, saturation, cMax ];
-    }
-  }
-
-  function HSVtoHSL (hsv) {
-    var h = hsv[0],
-      s = hsv[1]/100,
-      v = hsv[2]/100,
-      k = (2-s)*v;
-
-    return [
-      h,
-      Math.round(s*v / (k<1 ? k : 2-k) * 10000) / 100,
-      k/2 * 100
-    ];
-  }
-
-  function stringToInteger (string) {
-    var total = 0;
-    for (var i = 0; i !== string.length; i++) {
-      if (total >= Number.MAX_SAFE_INTEGER) break;
-      total += string.charCodeAt(i);
-    }
-    return total
-  }
-
-  // get The range of given hue when options.count!=0
-  function getRealHueRange(colorHue)
-  { if (!isNaN(colorHue)) {
-    var number = parseInt(colorHue);
-
-    if (number < 360 && number > 0) {
-      return getColorInfo(colorHue).hueRange
-    }
-  }
-    else if (typeof colorHue === 'string') {
-
-      if (colorDictionary[colorHue]) {
-        var color = colorDictionary[colorHue];
-
-        if (color.hueRange) {
-          return color.hueRange
-       }
-    } else if (colorHue.match(/^#?([0-9A-F]{3}|[0-9A-F]{6})$/i)) {
-        var hue = HexToHSB(colorHue)[0];
-        return getColorInfo(hue).hueRange
-    }
-  }
-
-    return [0,360]
-}
-  return randomColor;
-}));
-});
-
 class Layout {
-    constructor(node, direct, colors) {
+    constructor(node, direct, colors, mind) {
+        var _a;
         this.layoutName = 'mindmap';
         this.direct = '';
         this.levelDis = 40;
@@ -1620,11 +1167,14 @@ class Layout {
         this.lefts = [];
         this.rights = [];
         this.colors = [];
-        this.lineWidth = 2;
+        this.lineWidth = 1;
         this.root = node || null;
-        this.mind = (node === null || node === void 0 ? void 0 : node.mindmap) || null;
+        this.mind = mind || (node === null || node === void 0 ? void 0 : node.mindmap) || null;
         this.direct = direct || 'mindmap';
         this.colors = colors || [];
+        if (!((_a = this.mind) === null || _a === void 0 ? void 0 : _a.edgeGroup)) {
+            return;
+        }
         if (!this.svgDom)
             this.svgDom = this.mind.edgeGroup.group();
         this.layout();
@@ -1984,73 +1534,44 @@ class Layout {
                 var childPos = child.getPosition();
                 var childBox = Object.assign({}, child.getBox());
                 childBox.height = childBox.height + lineWidth;
-                let _stroke = node.stroke ? node.stroke : (child.stroke ? child.stroke : randomColor());
+                let _stroke = node.stroke ? node.stroke : (child.stroke ? child.stroke : 'var(--text-muted)');
                 if (!child.stroke) {
                     child.stroke = _stroke;
                 }
                 child._barDom.style.backgroundColor = _stroke;
                 child._barDom.style.borderColor = _stroke;
+                child.containEl.style.setProperty('--node-stroke', _stroke);
                 if (level == rootLevel) {
                     var from = {
                         x: pos.x + box.width / 2,
                         y: pos.y + box.height / 2
                     };
                 }
-                else if (level == 1 + rootLevel) {
+                else {
                     if (direct == 'right') {
-                        from = {
+                        var from = {
                             x: pos.x + box.width,
                             y: pos.y + box.height / 2
                         };
                     }
                     else {
-                        from = {
+                        var from = {
                             x: pos.x,
                             y: pos.y + box.height / 2
                         };
                     }
                 }
-                else {
-                    if (direct == 'right') {
-                        from = {
-                            x: pos.x + box.width,
-                            y: pos.y + box.height
-                        };
-                    }
-                    else {
-                        from = {
-                            x: pos.x,
-                            y: pos.y + box.height
-                        };
-                    }
-                }
-                if (level == rootLevel) {
-                    if (direct == 'right') {
-                        var to = {
-                            x: childPos.x,
-                            y: childBox.height / 2 + childPos.y
-                        };
-                    }
-                    else {
-                        to = {
-                            x: childPos.x + childBox.width,
-                            y: childBox.height / 2 + childPos.y
-                        };
-                    }
+                if (direct == 'right') {
+                    var to = {
+                        x: childPos.x,
+                        y: childBox.height / 2 + childPos.y
+                    };
                 }
                 else {
-                    if (direct == 'right') {
-                        to = {
-                            x: childPos.x,
-                            y: childBox.height + childPos.y
-                        };
-                    }
-                    else {
-                        to = {
-                            x: childPos.x + childBox.width,
-                            y: childBox.height + childPos.y
-                        };
-                    }
+                    var to = {
+                        x: childPos.x + childBox.width,
+                        y: childBox.height / 2 + childPos.y
+                    };
                 }
                 if (lineWidth % 2 == 1) {
                     var x1 = parseInt(from.x + '') - 0.5;
@@ -2063,6 +1584,12 @@ class Layout {
                     var y1 = parseInt(from.y + '');
                     var x2 = parseInt(to.x + '');
                     var y2 = parseInt(to.y + '');
+                }
+                if (!node.isShow() || !child.isShow() ||
+                    node.containEl.classList.contains('mm-node-dimmed') ||
+                    child.containEl.classList.contains('mm-node-dimmed')) {
+                    createLine(child);
+                    return;
                 }
                 if (level == rootLevel) {
                     var line1 = me.svgDom.path().stroke({
@@ -2081,32 +1608,39 @@ class Layout {
                     }).fill('none');
                 }
                 if (lineWidth % 2 == 1) {
-                    var x11 = parseInt(childPos.x + '') - 0.5;
-                    var x22 = parseInt(childPos.x + childBox.width + '') - 0.5;
-                    var y11 = y2;
-                    var y22 = y2;
+                    parseInt(childPos.x + '') - 0.5;
+                    parseInt(childPos.x + childBox.width + '') - 0.5;
                 }
                 else {
-                    var x11 = parseInt(childPos.x + '');
-                    var y11 = parseInt(childBox.height + childPos.y + '');
-                    var x22 = parseInt(childPos.x + childBox.width + '');
-                    var y22 = parseInt(childBox.height + childPos.y + '');
+                    parseInt(childPos.x + '');
+                    parseInt(childBox.height + childPos.y + '');
+                    parseInt(childPos.x + childBox.width + '');
+                    parseInt(childBox.height + childPos.y + '');
                 }
                 if (level == rootLevel) {
-                    var cpx1 = parseInt(from.x + '') + (to.x - from.x) / 9;
-                    var cpy1 = parseInt(from.y + '') + (to.y - from.y) / 9 * 8;
-                    var cpx2 = parseInt(from.x + (to.x - from.x) / 9 * 8 + '');
-                    var cpy2 = parseInt(to.y + '');
-                    var pathStr = `M${x1} ${y1}  C ${cpx1} ${cpy1}, ${cpx2} ${cpy2}, ${x2} ${y2}`;
+                    var cpx11 = {
+                        x: from.x + dis / 2,
+                        y: from.y
+                    };
+                    var cpx12 = {
+                        x: from.x + dis / 2,
+                        y: to.y
+                    };
+                    if (direct == 'left') {
+                        cpx11.x = from.x - dis / 2;
+                        cpx12.x = from.x - dis / 2;
+                    }
+                    var pathStr = `M${x1} ${y1}  C ${cpx11.x} ${cpx11.y}, ${cpx12.x} ${cpx12.y}, ${x2} ${y2}`;
                     line1.plot(pathStr);
                 }
                 else {
-                    me.svgDom.line(x11, y11, x22, y22).stroke({
-                        color: _stroke,
-                        width: lineWidth,
-                        linecap: 'miter',
-                        linejoin: 'miter'
-                    }).fill('none');
+                    // Underline removed for card-style layout
+                    // me.svgDom.line(x11, y11, x22, y22).stroke({
+                    // 	color: _stroke,
+                    // 	width: lineWidth,
+                    // 	linecap: 'miter',
+                    // 	linejoin: 'miter'
+                    // }).fill('none');
                     //var c = parseInt((to.y - from.y) / 6+'');
                     var cpx11 = {
                         x: from.x + dis / 2,
@@ -2130,12 +1664,33 @@ class Layout {
                 createLine(child);
             });
         }
+        const obsidianColors = [
+            'var(--mm-color-1)',
+            'var(--mm-color-2)',
+            'var(--mm-color-3)',
+            'var(--mm-color-4)',
+            'var(--mm-color-5)',
+            'var(--mm-color-6)',
+            'var(--mm-color-7)',
+            'var(--mm-color-8)'
+        ];
         //Set Node link Color
         this.root.children.forEach((c, i) => {
-            c.stroke = this.colors[i] || randomColor();
+            c.stroke = obsidianColors[i % obsidianColors.length];
         });
         createLine(root);
     }
+}
+
+var commonjsGlobal = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};
+
+function createCommonjsModule(fn) {
+  var module = { exports: {} };
+	return fn(module, module.exports), module.exports;
+}
+
+function commonjsRequire (path) {
+	throw new Error('Could not dynamically require "' + path + '". Please configure the dynamicRequireTargets or/and ignoreDynamicRequires option of @rollup/plugin-commonjs appropriately for this require call to work.');
 }
 
 /*!
@@ -8098,6 +7653,13 @@ class PasteNode extends Command {
     }
 }
 
+function uuid() {
+    function S4() {
+        return (((1 + Math.random()) * 0x10000) | 0).toString(16).substring(1);
+    }
+    return (S4() + S4() + '-' + S4() + '-' + S4());
+}
+
 class Exec {
     constructor() {
         this.history = new History(50);
@@ -8174,6 +7736,147 @@ class Exec {
     }
 }
 
+class FileSuggest {
+    constructor(app) {
+        this.files = [];
+        this.selectedIndex = 0;
+        this.activeQuery = "";
+        this.isOpen = false;
+        this.app = app;
+        this.containerEl = document.createElement('div');
+        this.containerEl.addClass('suggestion-container');
+        this.containerEl.style.position = 'absolute';
+        this.containerEl.style.zIndex = '1000';
+        this.containerEl.style.display = 'none';
+        this.containerEl.style.backgroundColor = 'var(--background-secondary)';
+        this.containerEl.style.border = '1px solid var(--background-modifier-border)';
+        this.containerEl.style.borderRadius = '6px';
+        this.containerEl.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
+        document.body.appendChild(this.containerEl);
+    }
+    open(node, rect, query) {
+        this.node = node;
+        this.activeQuery = query;
+        this.updateSuggestions();
+        if (this.files.length === 0) {
+            this.close();
+            return;
+        }
+        this.isOpen = true;
+        this.containerEl.style.display = 'block';
+        this.containerEl.style.top = `${rect.bottom + 5}px`;
+        this.containerEl.style.left = `${rect.left}px`;
+    }
+    close() {
+        this.isOpen = false;
+        this.containerEl.style.display = 'none';
+    }
+    updateSuggestions() {
+        const allFiles = this.app.vault.getMarkdownFiles();
+        if (!this.activeQuery) {
+            this.files = allFiles.slice(0, 10);
+        }
+        else {
+            const fuzzy = obsidian.prepareFuzzySearch(this.activeQuery);
+            const results = allFiles.map(file => {
+                const match = fuzzy(file.basename);
+                return { file, match };
+            }).filter(item => item.match)
+                .sort((a, b) => b.match.score - a.match.score)
+                .slice(0, 10);
+            this.files = results.map(item => item.file);
+        }
+        this.selectedIndex = 0;
+        this.render();
+    }
+    render() {
+        this.containerEl.empty();
+        this.files.forEach((file, index) => {
+            const itemEl = this.containerEl.createDiv('suggestion-item');
+            if (index === this.selectedIndex) {
+                itemEl.addClass('is-selected');
+            }
+            itemEl.setText(file.basename);
+            itemEl.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.selectFile(file);
+            });
+        });
+    }
+    handleKeydown(e) {
+        if (!this.isOpen)
+            return false;
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            this.selectedIndex = (this.selectedIndex + 1) % this.files.length;
+            this.render();
+            return true;
+        }
+        else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            this.selectedIndex = (this.selectedIndex - 1 + this.files.length) % this.files.length;
+            this.render();
+            return true;
+        }
+        else if (e.key === 'Enter') {
+            e.preventDefault();
+            e.stopPropagation();
+            if (this.files[this.selectedIndex]) {
+                this.selectFile(this.files[this.selectedIndex]);
+            }
+            return true;
+        }
+        else if (e.key === 'Escape') {
+            e.preventDefault();
+            this.close();
+            return true;
+        }
+        return false;
+    }
+    selectFile(file) {
+        if (this.node) {
+            const contentEl = this.node.contentEl;
+            const selection = window.getSelection();
+            if (!selection || selection.rangeCount === 0)
+                return;
+            const range = selection.getRangeAt(0);
+            const text = contentEl.innerText;
+            // Find the [[ before the cursor
+            const preCursorRange = range.cloneRange();
+            preCursorRange.selectNodeContents(contentEl);
+            preCursorRange.setEnd(range.endContainer, range.endOffset);
+            const textBeforeCursor = preCursorRange.toString();
+            const matchIndex = textBeforeCursor.lastIndexOf('[[');
+            if (matchIndex !== -1) {
+                // Delete everything from [[ to the cursor
+                textBeforeCursor.length - matchIndex;
+                // Expand range backwards to delete the [[ and query
+                range.endOffset;
+                range.endContainer;
+                // A simpler approach for contentEditable:
+                // Just replace the text content, since we don't have complex HTML inside during edit mode (it's plain text).
+                const newText = text.substring(0, matchIndex) + `[[${file.basename}]]` + text.substring(textBeforeCursor.length);
+                contentEl.innerText = newText;
+                // Set cursor to end of the inserted link
+                const newCursorPos = matchIndex + `[[${file.basename}]]`.length;
+                const newRange = document.createRange();
+                // Because innerText might create new text nodes or single text node
+                if (contentEl.firstChild) {
+                    try {
+                        newRange.setStart(contentEl.firstChild, newCursorPos);
+                        newRange.collapse(true);
+                        selection.removeAllRanges();
+                        selection.addRange(newRange);
+                    }
+                    catch (e) { }
+                }
+            }
+        }
+        this.close();
+    }
+}
+
 var mind = {};
 var color = ['#fda16c', '#74bdf7', '#71FF5E', 'orange', '#D4D4AA', 'yellow'];
 var canvasWidth = 8000;
@@ -8193,14 +7896,14 @@ const importXmind = function (data) {
     var mainlist = [];
     transferData(data.rootTopic, null, mainlist, true);
     var root = mainlist[0];
-    data.rootTopic.children && data.rootTopic.children.detached && data.rootTopic.children.detached.forEach(d => {
+    data.rootTopic.children && data.rootTopic.children.detached && data.rootTopic.children.detached.forEach((d) => {
         var list = [];
         transferData(d, root.id, list);
         mainlist = mainlist.concat(list);
     });
     mind.mindData.push(mainlist);
     mind.basicData = transferListToData(mainlist);
-    data.relationships && data.relationships.forEach(rl => {
+    data.relationships && data.relationships.forEach((rl) => {
         var obj = {
             startNodeId: rl.end1Id,
             endNodeId: rl.end2Id,
@@ -8319,7 +8022,7 @@ function transferData(data, parentId, list, mainFlag) {
         });
     }
     list.push(node);
-    data.children && data.children.attached && data.children.attached.forEach(c => {
+    data.children && data.children.attached && data.children.attached.forEach((c) => {
         transferData(c, data.id, list);
     });
     //induce
@@ -8354,7 +8057,7 @@ function transferData(data, parentId, list, mainFlag) {
         mind.induceData.push(induceData);
     });
     //wireframe
-    data.boundaries && data.boundaries.forEach(bum => {
+    data.boundaries && data.boundaries.forEach((bum) => {
         var r = bum.range.substring(1, bum.range.length - 1);
         var s = r.split(',')[0];
         var e = r.split(',')[1];
@@ -8386,7 +8089,7 @@ function transferData(data, parentId, list, mainFlag) {
         mind.wireFrameData.push(wf);
     });
     //collout
-    data.children && data.children.callout && data.children.callout.forEach(c => {
+    data.children && data.children.callout && data.children.callout.forEach((c) => {
         var callout = {
             nodeId: data.id,
             color: '#f06',
@@ -8417,9 +8120,10 @@ var jszip_min = createCommonjsModule(function (module, exports) {
 
 let deleteIcon = '<svg class="icon" width="16px" height="16.00px" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg"><path  d="M799.2 874.4c0 34.4-28 62.4-62.368 62.4H287.2a62.496 62.496 0 0 1-62.4-62.4V212h574.4v662.4zM349.6 100c0-7.2 5.6-12.8 12.8-12.8h300c7.2 0 12.768 5.6 12.768 12.8v37.6H349.6V100z m636.8 37.6H749.6V100c0-48-39.2-87.2-87.2-87.2h-300a87.392 87.392 0 0 0-87.2 87.2v37.6H37.6C16.8 137.6 0 154.4 0 175.2s16.8 37.6 37.6 37.6h112v661.6A137.6 137.6 0 0 0 287.2 1012h449.6a137.6 137.6 0 0 0 137.6-137.6V212h112c20.8 0 37.6-16.8 37.6-37.6s-16.8-36.8-37.6-36.8zM512 824c20.8 0 37.6-16.8 37.6-37.6v-400c0-20.8-16.768-37.6-37.6-37.6-20.8 0-37.6 16.8-37.6 37.6v400c0 20.8 16.8 37.6 37.6 37.6m-175.2 0c20.8 0 37.6-16.8 37.6-37.6v-400c0-20.8-16.8-37.6-37.6-37.6s-37.6 16.8-37.6 37.6v400c0.8 20.8 17.6 37.6 37.6 37.6m350.4 0c20.8 0 37.632-16.8 37.632-37.6v-400c0-20.8-16.8-37.6-37.632-37.6-20.768 0-37.6 16.8-37.6 37.6v400c0 20.8 16.8 37.6 37.6 37.6" /></svg>';
 let addIcon = '<svg class="icon" width="16px" height="16.00px" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg"><path  d="M512 1024C230.4 1024 0 793.6 0 512S230.4 0 512 0s512 230.4 512 512-230.4 512-512 512z m0-960C265.6 64 64 265.6 64 512s201.6 448 448 448 448-201.6 448-448S758.4 64 512 64z"  /><path d="M800 544H224c-19.2 0-32-12.8-32-32s12.8-32 32-32h576c19.2 0 32 12.8 32 32s-12.8 32-32 32z"  /><path  d="M512 832c-19.2 0-32-12.8-32-32V224c0-19.2 12.8-32 32-32s32 12.8 32 32v576c0 19.2-12.8 32-32 32z"  /></svg>';
+let focusIcon = '<svg class="icon" width="16px" height="16px" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg"><path d="M512 1024c-282.8 0-512-229.2-512-512s229.2-512 512-512 512 229.2 512 512-229.2 512-512 512z m0-960C264.8 64 64 264.8 64 512s200.8 448 448 448 448-200.8 448-448S759.2 64 512 64z m0 768c-176.8 0-320-143.2-320-320s143.2-320 320-320 320 143.2 320 320-143.2 320-320 320z m0-576c-141.2 0-256 114.8-256 256s114.8 256 256 256 256-114.8 256-256-114.8-256-256-256z m0 384c-70.6 0-128-57.4-128-128s57.4-128 128-128 128 57.4 128 128-57.4 128-128 128z m0-192c-35.4 0-64 28.6-64 64s28.6 64 64 64 64-28.6 64-64-28.6-64-64-64z"/></svg>';
 let tempDispLevel = 0;
 class MindMap {
-    constructor(data, containerEL, setting) {
+    constructor(data, containerEL, setting, view) {
         this._nodeNum = 0;
         this._tempNum = 0;
         this.colors = [];
@@ -8437,11 +8141,16 @@ class MindMap {
             background: 'transparent',
             color: 'inherit',
             exportMdModel: 'default',
-            headLevel: 2,
+            headLevel: 1,
             layoutDirect: ''
         }, setting || {});
         this.data = data;
+        this.view = view;
+        if (view) {
+            this.fileSuggest = new FileSuggest(view.app);
+        }
         this.appEl = document.createElement('div');
+        this.appEl.setAttribute('tabindex', '0');
         this.appEl.classList.add('mm-mindmap');
         this.appEl.classList.add(`mm-theme-${this.setting.theme}`);
         this.appEl.style.overflow = "auto";
@@ -8482,6 +8191,7 @@ class MindMap {
         this.appKeydown = this.appKeydown.bind(this);
         this.appMousewheel = this.appMousewheel.bind(this);
         this.appMouseMove = this.appMouseMove.bind(this);
+        this.appContextMenu = this.appContextMenu.bind(this);
         this.appMouseDown = this.appMouseDown.bind(this);
         this.appMouseUp = this.appMouseUp.bind(this);
         this.appFocusIn = this.appFocusIn.bind(this);
@@ -8493,16 +8203,47 @@ class MindMap {
         this.initEvent();
         //this.center();
         this.dispLevel = 0;
+        this.initControlPanel();
+    }
+    initControlPanel() {
+        const panel = document.createElement('div');
+        panel.classList.add('mm-control-panel');
+        panel.innerHTML = `
+            <div class="mm-ctrl-btn mm-ctrl-zoom-in" title="Zoom In">+</div>
+            <div class="mm-ctrl-btn mm-ctrl-zoom-out" title="Zoom Out">-</div>
+            <div class="mm-ctrl-btn mm-ctrl-center" title="Center/Fit">⛶</div>
+        `;
+        // Append to containerEL so it stays fixed relative to the viewport, not the scaled content
+        this.containerEL.appendChild(panel);
+        panel.querySelector('.mm-ctrl-zoom-in').addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.setScale("up");
+        });
+        panel.querySelector('.mm-ctrl-zoom-out').addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.setScale("down");
+        });
+        panel.querySelector('.mm-ctrl-center').addEventListener('click', (e) => {
+            e.preventDefault();
+            this.fit();
+        });
     }
     setMenuIcon() {
         var addNodeDom = document.createElement('span');
         var deleteNodeDom = document.createElement('span');
+        var focusNodeDom = document.createElement('span');
         addNodeDom.classList.add('mm-icon-add-node');
         deleteNodeDom.classList.add('mm-icon-delete-node');
+        focusNodeDom.classList.add('mm-icon-focus-node');
         addNodeDom.innerHTML = addIcon;
         deleteNodeDom.innerHTML = deleteIcon;
+        focusNodeDom.innerHTML = focusIcon;
+        addNodeDom.title = "Add Child Node";
+        deleteNodeDom.title = "Delete Node";
+        focusNodeDom.title = "Focus Node";
         this._menuDom.appendChild(addNodeDom);
         this._menuDom.appendChild(deleteNodeDom);
+        this._menuDom.appendChild(focusNodeDom);
     }
     setAppSetting() {
         this.appEl.style.width = `${this.setting.canvasSize}px`;
@@ -8630,6 +8371,7 @@ class MindMap {
     }
     initEvent() {
         this.appEl.addEventListener('click', this.appClickFn);
+        this.appEl.addEventListener('contextmenu', this.appContextMenu);
         this.appEl.addEventListener('mouseover', this.appMouseOverFn);
         this.appEl.addEventListener('dblclick', this.appDblclickFn);
         this.appEl.addEventListener('dragstart', this.appDragstart);
@@ -8655,6 +8397,7 @@ class MindMap {
     }
     removeEvent() {
         this.appEl.removeEventListener('click', this.appClickFn);
+        this.appEl.removeEventListener('contextmenu', this.appContextMenu);
         this.appEl.removeEventListener('dragstart', this.appDragstart);
         this.appEl.removeEventListener('dragover', this.appDragover);
         this.appEl.removeEventListener('dragend', this.appDragend);
@@ -8710,10 +8453,136 @@ class MindMap {
     appKeydown(e) {
         if (!this.isFocused)
             return; // Check if Mindmap is in focus or not
-        e.keyCode || e.which || e.charCode;
-        e.ctrlKey || e.metaKey;
-        e.shiftKey;
-        e.altKey;
+        var keyCode = e.keyCode || e.which || e.charCode;
+        var ctrlKey = e.ctrlKey || e.metaKey;
+        var shiftKey = e.shiftKey;
+        var altKey = e.altKey;
+        // if (ctrlKey) {                         // Shift -> Selecting
+        //     // ctrl -> selecting
+        //     this.selectingNodes = true;
+        // } else {
+        //     this.selectingNodes = false;
+        // }
+        if (!ctrlKey && !shiftKey && !altKey) { // No special key
+            // Focus Mode: F key (70)
+            if (keyCode == 70) {
+                var node = this.selectNode;
+                if (node && !node.data.isEdit) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (this.focusedNode === node) {
+                        this.focusedNode = undefined;
+                    }
+                    else {
+                        this.focusedNode = node;
+                    }
+                    this.refresh();
+                    this.centerOnNode(this.focusedNode || this.root);
+                }
+            }
+            // Esc key (27) to exit Focus Mode
+            if (keyCode == 27) {
+                if (this.focusedNode) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.focusedNode = undefined;
+                    this.refresh();
+                    this.centerOnNode(this.root);
+                }
+            }
+            // Space
+            if (keyCode == 32) {
+                var node = this.selectNode;
+                if (node && !node.data.isEdit) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    node.edit();
+                    this._menuDom.style.display = 'none';
+                }
+            }
+            // Enter
+            if (keyCode == 13 || e.key == 'Enter') {
+                var node = this.selectNode;
+                if (node) {
+                    if (!node.data.isEdit) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (!node.parent)
+                            return;
+                        var newNode = node.mindmap.execute('addSiblingNode', {
+                            parent: node.parent
+                        });
+                        this._menuDom.style.display = 'none';
+                        this.moveNode(newNode, node, 'down', false);
+                    }
+                    else {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        this.clearSelectNode();
+                        node.select();
+                        node.mindmap.editNode = null;
+                    }
+                }
+            }
+            // Delete / Backspace
+            if (keyCode == 46 || e.key == 'Delete' || e.key == 'Backspace') {
+                var node = this.selectNode;
+                if (node && !node.data.isRoot && !node.data.isEdit) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    node.mindmap.execute("deleteNodeAndChild", { node });
+                    this._menuDom.style.display = 'none';
+                }
+            }
+            // Tab / Insert
+            if (keyCode == 9 || keyCode == 45 || e.key == 'Tab') {
+                var node = this.selectNode;
+                if (node) {
+                    if (!node.data.isEdit) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (!node.isExpand) {
+                            node.expand();
+                        }
+                        node.mindmap.execute("addChildNode", { parent: node });
+                        this._menuDom.style.display = 'none';
+                    }
+                    else {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        this.clearSelectNode();
+                        node.select();
+                        node.mindmap.editNode = null;
+                    }
+                }
+            }
+            // Escape
+            if (keyCode == 27) {
+                e.preventDefault();
+                e.stopPropagation();
+                var node = this.selectNode;
+                if (node && node.data.isEdit) {
+                    node.select();
+                    node.mindmap.editNode = null;
+                    node.cancelEdit();
+                    this.undo();
+                }
+            }
+        }
+        if (ctrlKey && !shiftKey && !altKey) { // CTRL key
+            //ctrl + y
+            if (keyCode == 89) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.redo();
+            }
+            //ctrl + z
+            if (keyCode == 90) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.undo();
+            }
+        }
         // Shift + F2 : Edit as space does
         // if (!ctrlKey && shiftKey && !altKey) {  // SHIFT key
         //     if (keyCode == 113) {
@@ -8754,77 +8623,6 @@ class MindMap {
         //     this.selectingNodes = false;
         // }
         if (!ctrlKey && !shiftKey && !altKey) { // NO SPECIAL KEY
-            // Enter
-            // if (keyCode == 13 || e.key =='Enter') {
-            //     var node = this.selectNode;
-            //     e.preventDefault();
-            //     e.stopPropagation();
-            //     if(node) {// A node is selected
-            //         if (!node.data.isEdit) {// Not editing a node => Add sibling node
-            //             if (!node.isExpand) {
-            //                 node.expand();
-            //             }
-            //             if (!node.parent) return;
-            //             node.mindmap.execute('addSiblingNode', {
-            //                 parent: node.parent
-            //             });
-            //             this._menuDom.style.display='none';
-            //         }
-            //         else {// Editing mode => end edit mode
-            //             //node.cancelEdit();
-            //             this.clearSelectNode();
-            //             node.select();
-            //             node.mindmap.editNode=null;
-            //             //this.selectNode.unSelect();
-            //         }
-            //     }
-            //     //else: no node selected: nothing to do
-            // }
-            //delete
-            // if (keyCode == 46 || e.key == 'Delete' || e.key == 'Backspace') {
-            //     var node = this.selectNode;
-            //     if (node && !node.data.isRoot && !node.data.isEdit) {
-            //         e.preventDefault();
-            //         e.stopPropagation();
-            //         node.mindmap.execute("deleteNodeAndChild", { node });
-            //         this._menuDom.style.display='none';
-            //     }
-            //     //else: Deletion makes no sense
-            // }
-            // Tab / Insert
-            // if (keyCode == 9 || keyCode == 45 || e.key == 'Tab') {
-            //     e.preventDefault();
-            //     e.stopPropagation();
-            //     var node = this.selectNode;
-            //     if(node) {
-            //         if (!node.data.isEdit) {// Not editing
-            //             if (!node.isExpand) {
-            //                 node.expand();
-            //             }
-            //             node.mindmap.execute("addChildNode", { parent: node });
-            //             this._menuDom.style.display='none';
-            //         } else{
-            //             // this.selectNode.unSelect();
-            //             this.clearSelectNode();
-            //             node.select();
-            //             node.mindmap.editNode=null;
-            //         }
-            //     }
-            //     //else: no node selected -> nothing to do
-            // }
-            // Escape
-            if (keyCode == 27) {
-                e.preventDefault();
-                e.stopPropagation();
-                var node = this.selectNode;
-                if (node && node.data.isEdit) {
-                    node.select();
-                    node.mindmap.editNode = null;
-                    node.cancelEdit();
-                    this.undo();
-                    //this.selectNode.unSelect();
-                }
-            }
             // up
             if (keyCode == 38 || e.key == 'ArrowUp') {
                 e.preventDefault();
@@ -9468,13 +9266,15 @@ class MindMap {
         var _a;
         var targetEl = evt.target;
         if (targetEl) {
-            if (targetEl.tagName == 'A' && targetEl.hasClass("internal-link")) {
+            var internalLink = targetEl.closest('a.internal-link');
+            if (internalLink) {
                 evt.preventDefault();
-                var targetEl = evt.target;
-                var href = targetEl.getAttr("href");
+                evt.stopPropagation();
+                var href = internalLink.getAttribute("data-href") || internalLink.getAttribute("href");
                 if (href) {
                     this.view.app.workspace.openLinkText(href, this.view.file.path, evt.ctrlKey || evt.metaKey);
                 }
+                return;
             }
             if (targetEl.hasClass('mm-node-bar')) {
                 evt.preventDefault();
@@ -9508,6 +9308,20 @@ class MindMap {
                         this._menuDom.style.display = 'none';
                     }
                 }
+                if (targetEl.closest('.mm-icon-focus-node')) {
+                    var selectNode = this.selectNode;
+                    if (selectNode && !selectNode.data.isEdit) {
+                        if (this.focusedNode === selectNode) {
+                            this.focusedNode = undefined;
+                        }
+                        else {
+                            this.focusedNode = selectNode;
+                        }
+                        this.refresh();
+                        this.centerOnNode(this.focusedNode || this.root);
+                        this._menuDom.style.display = 'none';
+                    }
+                }
                 return;
             }
             if (targetEl.closest('.mm-node')) {
@@ -9517,17 +9331,44 @@ class MindMap {
                     this.clearSelectNode();
                     this.selectNode = node;
                     (_a = this.selectNode) === null || _a === void 0 ? void 0 : _a.select();
-                    // this._menuDom.style.display='block';
-                    this._menuDom.style.display = 'none';
-                    this.selectNode.getBox();
-                    // this._menuDom.style.left = `${box.x + box.width + 10}px`;
-                    // this._menuDom.style.top = `${box.y + box.height/2 - 14}px`;
                 }
+                this._menuDom.style.display = 'none';
             }
             else {
                 this.clearSelectNode();
                 this._menuDom.style.display = 'none';
             }
+        }
+    }
+    appContextMenu(evt) {
+        var _a;
+        if (!this.isFocused)
+            return;
+        let targetEl = evt.target;
+        if (targetEl.closest('.mm-node')) {
+            evt.preventDefault();
+            evt.stopPropagation();
+            var id = targetEl.closest('.mm-node').getAttribute('data-id');
+            var node = this.getNodeById(id);
+            this.clearSelectNode();
+            this.selectNode = node;
+            (_a = this.selectNode) === null || _a === void 0 ? void 0 : _a.select();
+            this._menuDom.style.display = 'flex';
+            // Calculate position
+            var box = this.selectNode.getBox();
+            var rootPos = this.root.getBox();
+            // If the node is on the left side of the root (or is root), we might position differently
+            // Usually we show it on the outer edge
+            if (box.x < rootPos.x) {
+                // Node is on the left side of root, place menu on the left of the node
+                this._menuDom.style.left = `${box.x - 40}px`;
+            }
+            else {
+                // Node is on the right side of root (or is root), place menu on the right
+                this._menuDom.style.left = `${box.x + box.width + 10}px`;
+            }
+            // Vertically center with the node
+            this._menuDom.style.top = `${box.y + box.height / 2 - 45}px`;
         }
     }
     appDragstart(evt) {
@@ -9696,17 +9537,22 @@ class MindMap {
         this._menuDom.style.display = 'none';
     }
     appMouseOverFn(evt) {
+        var _a, _b;
         const targetEl = evt.target;
-        if (targetEl.tagName !== "A")
-            return;
-        if (targetEl.hasClass("internal-link")) {
+        const linkEl = targetEl.closest("a.internal-link");
+        const sourcePath = (_b = (_a = this.view) === null || _a === void 0 ? void 0 : _a.file) === null || _b === void 0 ? void 0 : _b.path;
+        if (linkEl && sourcePath) {
+            const linktext = linkEl.getAttribute("data-href") || linkEl.getAttribute("href") || linkEl.innerText;
+            if (!linktext) {
+                return;
+            }
             this.view.app.workspace.trigger("hover-link", {
                 event: evt,
-                source: frontMatterKey,
+                source: "preview",
                 hoverParent: this.view,
-                targetEl,
-                linktext: targetEl.getAttr("href"),
-                sourcePath: this.view.file.path,
+                targetEl: linkEl,
+                linktext,
+                sourcePath,
             });
         }
     }
@@ -9988,14 +9834,57 @@ class MindMap {
     }
     //layout
     layout() {
+        var activeRoot = this.focusedNode || this.root;
+        // Ensure all nodes are display: block to maintain layout space
+        // and remove any previously added dimmed classes
+        this.traverseBF((n) => {
+            n.containEl.style.display = 'block';
+            n.containEl.classList.remove('mm-node-dimmed');
+        }, this.root);
+        // ALWAYS layout from this.root so the tree shape does not change
         if (!this.mmLayout) {
-            this.mmLayout = new Layout(this.root, this.setting.layoutDirect || 'mind map', this.colors);
-            // Select and center on the mindmap's root when opening it
-            this.root.select();
-            this.centerOnNode(this.root);
-            return;
+            this.mmLayout = new Layout(this.root, this.setting.layoutDirect || 'mind map', this.colors, this);
+            activeRoot.select();
+            this.centerOnNode(activeRoot);
         }
-        this.mmLayout.layout(this.root, this.setting.layoutDirect || this.mmLayout.direct || 'mind map');
+        else {
+            this.mmLayout.layout(this.root, this.setting.layoutDirect || this.mmLayout.direct || 'mind map');
+        }
+        // Apply Focus Mode AFTER layout finishes
+        if (this.focusedNode) {
+            let activeSubtree = new Set();
+            this.traverseBF((n) => activeSubtree.add(n), activeRoot);
+            this.traverseBF((n) => {
+                if (!activeSubtree.has(n)) {
+                    n.containEl.classList.add('mm-node-dimmed');
+                    n.containEl.style.opacity = '0';
+                    n.containEl.style.visibility = 'hidden';
+                    n.containEl.style.pointerEvents = 'none';
+                }
+                else {
+                    n.containEl.classList.remove('mm-node-dimmed');
+                    n.containEl.style.opacity = '1';
+                    n.containEl.style.visibility = 'visible';
+                    n.containEl.style.pointerEvents = 'auto';
+                }
+            }, this.root);
+            this.appEl.style.backgroundColor = 'rgba(0, 0, 0, 0.4)';
+            this.appEl.style.boxShadow = 'inset 0 0 150px rgba(0,0,0,0.5)';
+        }
+        else {
+            this.traverseBF((n) => {
+                n.containEl.classList.remove('mm-node-dimmed');
+                n.containEl.style.opacity = '1';
+                n.containEl.style.visibility = 'visible';
+                n.containEl.style.pointerEvents = 'auto';
+            }, this.root);
+            this.appEl.style.backgroundColor = '';
+            this.appEl.style.boxShadow = '';
+        }
+        // Redraw SVG links so they can inherit the dimmed status of the nodes
+        if (this.mmLayout && this.mmLayout.createLink) {
+            this.mmLayout.createLink();
+        }
     }
     refresh() {
         this.layout();
@@ -10047,6 +9936,43 @@ class MindMap {
             this.containerEL.scrollLeft = pos_x - (w / 2 - dim_x / 2) + 200;
             this.scale(oldScale);
         }
+    }
+    fit() {
+        if (!this.root)
+            return;
+        var activeRoot = this.focusedNode || this.root;
+        var minX = Infinity;
+        var minY = Infinity;
+        var maxX = -Infinity;
+        var maxY = -Infinity;
+        this.traverseBF((n) => {
+            if (n.containEl.style.display === 'none')
+                return;
+            var pos = n.getPosition();
+            var dim = n.getDimensions();
+            if (pos.x < minX)
+                minX = pos.x;
+            if (pos.y < minY)
+                minY = pos.y;
+            if (pos.x + dim.x > maxX)
+                maxX = pos.x + dim.x;
+            if (pos.y + dim.y > maxY)
+                maxY = pos.y + dim.y;
+        }, activeRoot);
+        if (minX === Infinity)
+            return;
+        var w = this.containerEL.clientWidth;
+        var h = this.containerEL.clientHeight;
+        var contentW = maxX - minX + 200; // padding
+        var contentH = maxY - minY + 200; // padding
+        var scaleX = w / contentW;
+        var scaleY = h / contentH;
+        var newScale = Math.min(scaleX, scaleY, 1);
+        this.scale(newScale * 100);
+        var centerX = minX + (maxX - minX) / 2;
+        var centerY = minY + (maxY - minY) / 2;
+        this.containerEL.scrollLeft = centerX - w / 2;
+        this.containerEL.scrollTop = centerY - h / 2;
     }
     _resetMaxDisplayedLevel() {
         this.dispLevel = 0;
@@ -10145,16 +10071,18 @@ class MindMap {
                 hPrefix = '\n';
             }
             const ending = n.isExpand ? '' : ` ^${n.getId()}`;
-            if (n.getLevel() < level) {
+            let actualLevel = Math.min(level, 6);
+            if (n.getLevel() < actualLevel) {
                 for (let i = 0; i < l; i++) {
                     hPrefix += '#';
                 }
                 md += (hPrefix + ' ');
-                md += n.getData().text.trim() + ending + '\n';
+                let headingText = n.getData().text.trim().replace(/\n/g, '<br>');
+                md += headingText + ending + '\n';
             }
             else {
-                for (var i = 0; i < n.getLevel() - level; i++) {
-                    space += '\t';
+                for (var i = 0; i < n.getLevel() - actualLevel; i++) {
+                    space += '    ';
                 }
                 var text = n.getData().text.trim();
                 if (text) {
@@ -10175,26 +10103,12 @@ class MindMap {
                         }
                         else {
                             //text
-                            md += `${space}- `;
-                            textArr.forEach((t, i) => {
-                                var contentText = "void";
-                                if (t.trim().length > 0) {
-                                    contentText = t.trim();
-                                }
-                                if (i > 0) {
-                                    md += `${space}${contentText}${i === textArr.length - 1 ? ending : ''}\n`;
-                                }
-                                else {
-                                    md += `${contentText}\n`;
-                                }
-                            });
+                            let singleLineText = text.replace(/\n/g, '<br>');
+                            md += `${space}- ${singleLineText}${ending}\n`;
                         }
                     }
                 }
                 else {
-                    for (var i = 0; i < n.getLevel() - level; i++) {
-                        space += '   ';
-                    }
                     md += `${space}-\n`;
                 }
             }
@@ -38889,14 +38803,8 @@ var domToImageMore = createCommonjsModule(function (module, exports) {
 })(commonjsGlobal);
 });
 
-function uuid() {
-    function S4() {
-        return (((1 + Math.random()) * 0x10000) | 0).toString(16).substring(1);
-    }
-    return (S4() + S4() + '-' + S4() + '-' + S4());
-}
 const transformer = new browser.Transformer();
-const mindmapViewType = "mindmapView";
+const mindmapViewType = "mindmapViewUpgraded";
 const mindmapIcon = "blocks";
 class MindMapView extends obsidian.TextFileView {
     getViewType() {
@@ -38921,9 +38829,7 @@ class MindMapView extends obsidian.TextFileView {
             console.log(err, 'stroke array is error');
         }
         this.colors = this.colors.concat(colors);
-        for (var i = 0; i < 50; i++) {
-            this.colors.push(randomColor());
-        }
+        // We no longer add 50 random colors. Layout.ts now uses CSS variable defined theme palettes.
     }
     exportToSvg() {
         if (!this.mindmap) {
@@ -38958,15 +38864,15 @@ class MindMapView extends obsidian.TextFileView {
                 var img = new Image();
                 img.src = dataUrl;
                 var str = img.outerHTML;
-                var p = this.mindmap.path.substr(0, this.mindmap.path.length - 2);
+                const fileName = this.mindmap.path.replace(/\.md$/, '.html');
                 try {
-                    new obsidian.Notice(p + 'html');
-                    this.app.vault.adapter.write(p + 'html', str);
+                    new obsidian.Notice(`Mindmap exported as HTML: ${fileName}`);
+                    this.app.vault.adapter.write(fileName, str);
                     this.restoreMindmap(rootBox, oldScrollLeft, oldScrollTop);
                 }
                 catch (err) {
                     this.restoreMindmap(rootBox, oldScrollLeft, oldScrollTop);
-                    new obsidian.Notice(err);
+                    new obsidian.Notice(`Failed to export mindmap: ${err}`);
                 }
             }).catch(err => {
                 this.restoreMindmap(rootBox, oldScrollLeft, oldScrollTop);
@@ -39130,6 +39036,7 @@ class MindMapView extends obsidian.TextFileView {
     }
     constructor(leaf, plugin) {
         super(leaf);
+        this.hoverPopover = null;
         this.id = this.leaf.id;
         this.colors = [];
         this.timeOut = null;
@@ -39178,7 +39085,7 @@ class MindMapView extends obsidian.TextFileView {
         //     }
         //   });
         // }
-        this.mindmap = new MindMap(mindData, this.contentEl, this.plugin.settings);
+        this.mindmap = new MindMap(mindData, this.contentEl, this.plugin.settings, this);
         this.mindmap.colors = this.colors;
         if (this.firstInit) {
             setTimeout(() => {
@@ -39194,6 +39101,17 @@ class MindMapView extends obsidian.TextFileView {
                 this.mindmap.init();
                 this.mindmap.refresh();
                 this.mindmap.view = this;
+                // Auto-edit root node if the mindmap is completely new
+                if (mdText.trim() === "") {
+                    setTimeout(() => {
+                        if (this.mindmap && this.mindmap.root) {
+                            if (this.leaf) {
+                                this.app.workspace.setActiveLeaf(this.leaf, false, true);
+                            }
+                            this.mindmap.root.edit();
+                        }
+                    }, 600);
+                }
                 this.firstInit = false;
             }, 100);
         }
@@ -39208,8 +39126,6 @@ class MindMapView extends obsidian.TextFileView {
         }
     }
     onunload() {
-        this.app.workspace.offref("quick-preview");
-        this.app.workspace.offref("resize");
         if (this.mindmap) {
             this.mindmap.clear();
             this.contentEl.innerHTML = '';
@@ -39219,10 +39135,38 @@ class MindMapView extends obsidian.TextFileView {
     }
     onload() {
         super.onload();
-        this.registerEvent(this.app.workspace.on("quick-preview", () => this.onQuickPreview, this));
-        //    this.registerEvent(
-        //      this.app.workspace.on('resize', () => this.updateMindMap(), this)
-        //    );
+        this.registerEvent(this.app.workspace.on("quick-preview", this.onQuickPreview, this));
+        this.registerEvent(this.app.workspace.on('active-leaf-change', (leaf) => {
+            if (leaf === this.leaf) {
+                setTimeout(() => this.updateMindMap(), 100);
+            }
+        }));
+        // 增加切换回 Markdown 的快捷按钮
+        this.addAction("document", t("Open as markdown"), () => {
+            this.plugin.mindmapFileModes[this.id || this.file.path] = "markdown";
+            this.plugin.setMarkdownView(this.leaf);
+        });
+        // 增加向右分屏并以 Markdown 展示的快捷按钮 (Toggle 模式)
+        this.addAction("sidebar-right", "Toggle split right (Markdown)", () => {
+            // 查找当前工作区中是否已经有显示该文件的 markdown 视图
+            const leaves = this.app.workspace.getLeavesOfType("markdown");
+            const existingLeaf = leaves.find(l => {
+                const view = l.view;
+                return view.file && view.file.path === this.file.path;
+            });
+            if (existingLeaf) {
+                // 如果已经存在，则将其关闭（取消分屏）
+                existingLeaf.detach();
+            }
+            else {
+                // 否则，创建一个新的右侧分屏叶子
+                const newLeaf = this.app.workspace.getLeaf("split", "vertical");
+                // 标记这个新叶子需要以 Markdown 模式打开，避免被插件再次拦截为导图
+                this.plugin.mindmapFileModes[newLeaf.id || this.file.path] = "markdown";
+                // 在新叶子中打开当前文件
+                newLeaf.openFile(this.file, { active: true });
+            }
+        });
     }
     onQuickPreview(file, data) {
         if (file === this.file && data !== this.data) {
@@ -39231,11 +39175,16 @@ class MindMapView extends obsidian.TextFileView {
         }
     }
     updateMindMap() {
-        if (this.mindmap) {
+        if (this.mindmap && this.contentEl && this.contentEl.clientWidth > 0) {
+            this.mindmap.refresh();
             if (obsidian.Platform.isDesktopApp) {
                 this.mindmap.center();
             }
         }
+    }
+    onResize() {
+        super.onResize();
+        this.updateMindMap();
     }
     onFileMetadataChange(file) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -39257,12 +39206,13 @@ class MindMapView extends obsidian.TextFileView {
                 flag = false;
                 mapData.v = '> ' + mapData.v;
             }
-            const regexResult = /^.+ \^([a-z0-9\-]+)$/gim.exec(mapData.v);
+            const regexResult = /^.+ \^([a-z0-9\-]+)$/im.exec(mapData.v);
             const id = regexResult != null ? regexResult[1] : null;
             // console.log(id);
+            var rawText = id ? mapData.v.replace(` ^${id}`, '') : mapData.v;
             var map = {
                 id: id || uuid(),
-                text: id ? mapData.v.replace(` ^${id}`, '') : mapData.v,
+                text: rawText.replace(/<br>/g, '\n'),
                 children: [],
                 expanded: id ? false : true
             };
@@ -39286,6 +39236,7 @@ class MindMapView extends obsidian.TextFileView {
         }
     }
     onMoreOptionsMenu(menu) {
+        var _a;
         // Add a menu item to force the board to markdown view
         menu
             .addItem((item) => {
@@ -39310,7 +39261,8 @@ class MindMapView extends obsidian.TextFileView {
         //       }
         //    })
         // })
-        super.onPaneMenu(menu, 'more-options');
+        const parentView = Object.getPrototypeOf(MindMapView.prototype);
+        (_a = parentView.onPaneMenu) === null || _a === void 0 ? void 0 : _a.call(this, menu, 'more-options');
     }
 }
 
@@ -39543,62 +39495,51 @@ class MindMapPlugin extends obsidian.Plugin {
             this.addCommand({
                 id: 'Copy Node',
                 name: `${t('Copy node')}`,
-                hotkeys: [
-                    {
-                        modifiers: ['Alt', 'Shift'],
-                        key: 'C',
-                    },
-                ],
-                callback: () => {
+                checkCallback: (checking) => {
                     const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
                     if (mindmapView) {
                         var mindmap = mindmapView.mindmap;
-                        navigator.clipboard.writeText('');
                         var node = mindmap.selectNode;
-                        if (node) {
-                            var text = mindmap.copyNode(node);
-                            navigator.clipboard.writeText(text);
+                        if (node && !node.data.isEdit) {
+                            if (!checking) {
+                                var text = mindmap.copyNode(node);
+                                navigator.clipboard.writeText(text);
+                            }
+                            return true;
                         }
                     }
+                    return false;
                 }
             });
             // Alt + Shift + X
             this.addCommand({
                 id: 'Cut Node',
                 name: `${t('Cut node')}`,
-                hotkeys: [
-                    {
-                        modifiers: ['Alt', 'Shift'],
-                        key: 'X',
-                    },
-                ],
-                callback: () => {
+                checkCallback: (checking) => {
                     const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
                     if (mindmapView) {
                         var mindmap = mindmapView.mindmap;
-                        navigator.clipboard.writeText('');
                         var node = mindmap.selectNode;
-                        if (node) {
-                            var text = mindmap.copyNode(node);
-                            navigator.clipboard.writeText(text);
-                            if (!node.data.isRoot && !node.data.isEdit) {
-                                node.mindmap.execute("deleteNodeAndChild", { node });
-                                mindmap._menuDom.style.display = 'none';
+                        if (node && !node.data.isEdit) {
+                            if (!checking) {
+                                navigator.clipboard.writeText('');
+                                var text = mindmap.copyNode(node);
+                                navigator.clipboard.writeText(text);
+                                if (!node.data.isRoot) {
+                                    node.mindmap.execute("deleteNodeAndChild", { node });
+                                    mindmap._menuDom.style.display = 'none';
+                                }
                             }
+                            return true;
                         }
                     }
+                    return false;
                 }
             });
             // Alt + Shift + V
             this.addCommand({
                 id: 'Paste Node',
                 name: `${t('Paste node')}`,
-                hotkeys: [
-                    {
-                        modifiers: ['Alt', 'Shift'],
-                        key: 'V',
-                    },
-                ],
                 callback: () => {
                     const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
                     if (mindmapView) {
@@ -39615,12 +39556,6 @@ class MindMapPlugin extends obsidian.Plugin {
             this.addCommand({
                 id: 'Undo',
                 name: `${t('Undo')}`,
-                hotkeys: [
-                    {
-                        modifiers: ['Alt', 'Shift'],
-                        key: 'Z',
-                    },
-                ],
                 callback: () => {
                     const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
                     if (mindmapView) {
@@ -39633,12 +39568,6 @@ class MindMapPlugin extends obsidian.Plugin {
             this.addCommand({
                 id: 'Redo',
                 name: `${t('Redo')}`,
-                hotkeys: [
-                    {
-                        modifiers: ['Alt', 'Shift'],
-                        key: 'Y',
-                    },
-                ],
                 callback: () => {
                     const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
                     if (mindmapView) {
@@ -39675,28 +39604,26 @@ class MindMapPlugin extends obsidian.Plugin {
                         key: 'F2',
                     },
                 ],
-                callback: () => {
+                checkCallback: (checking) => {
                     const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
                     if (mindmapView) {
                         var mindmap = mindmapView.mindmap;
                         var node = mindmap.selectNode;
                         if (node && !node.data.isEdit) {
-                            node.edit();
-                            mindmap._menuDom.style.display = 'none';
+                            if (!checking) {
+                                node.edit();
+                                mindmap._menuDom.style.display = 'none';
+                            }
+                            return true;
                         }
                     }
+                    return false;
                 }
             });
             // Alt + Shift + Enter
             this.addCommand({
                 id: 'Add sibling/end editing',
                 name: `${t('Add sibling/end editing')}`,
-                hotkeys: [
-                    {
-                        modifiers: ['Alt', 'Shift'],
-                        key: 'Enter',
-                    },
-                ],
                 callback: () => {
                     const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
                     if (mindmapView) {
@@ -39732,12 +39659,6 @@ class MindMapPlugin extends obsidian.Plugin {
             this.addCommand({
                 id: 'Insert child',
                 name: `${t('Insert child')}`,
-                hotkeys: [
-                    {
-                        modifiers: ['Shift'],
-                        key: 'Insert',
-                    },
-                ],
                 callback: () => {
                     const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
                     if (mindmapView) {
@@ -39772,17 +39693,20 @@ class MindMapPlugin extends obsidian.Plugin {
                         key: 'Delete',
                     },
                 ],
-                callback: () => {
+                checkCallback: (checking) => {
                     const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
                     if (mindmapView) {
                         var mindmap = mindmapView.mindmap;
                         var node = mindmap.selectNode;
                         if (node && !node.data.isRoot && !node.data.isEdit) {
-                            node.mindmap.execute("deleteNodeAndChild", { node });
-                            mindmap._menuDom.style.display = 'none';
+                            if (!checking) {
+                                node.mindmap.execute("deleteNodeAndChild", { node });
+                                mindmap._menuDom.style.display = 'none';
+                            }
+                            return true;
                         }
-                        //else: Deletion makes no sense
                     }
+                    return false;
                 }
             });
             // Alt + Shift + S
@@ -40413,6 +40337,42 @@ class MindMapPlugin extends obsidian.Plugin {
                     }
                 }
             });
+            // Zoom in
+            this.addCommand({
+                id: 'Zoom in',
+                name: `${t('Zoom in')}`,
+                hotkeys: [
+                    {
+                        modifiers: ['Alt'],
+                        key: '=',
+                    },
+                ],
+                callback: () => {
+                    const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
+                    if (mindmapView) {
+                        var mindmap = mindmapView.mindmap;
+                        mindmap.setScale("up");
+                    }
+                }
+            });
+            // Zoom out
+            this.addCommand({
+                id: 'Zoom out',
+                name: `${t('Zoom out')}`,
+                hotkeys: [
+                    {
+                        modifiers: ['Alt'],
+                        key: '-',
+                    },
+                ],
+                callback: () => {
+                    const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
+                    if (mindmapView) {
+                        var mindmap = mindmapView.mindmap;
+                        mindmap.setScale("down");
+                    }
+                }
+            });
             this.addCommand({
                 id: 'Display the node\'s info in console',
                 name: `${t('Display the node\'s info in console')}`,
@@ -40512,8 +40472,9 @@ class MindMapPlugin extends obsidian.Plugin {
         });
     }
     onunload() {
+        var _a, _b;
         this.app.workspace.detachLeavesOfType(mindmapViewType);
-        //this.app.workspace.unregisterHoverLinkSource(frontMatterKey);
+        (_b = (_a = this.app.workspace).unregisterHoverLinkSource) === null || _b === void 0 ? void 0 : _b.call(_a, mindmapViewType);
     }
     newMindMap(folder) {
         var _a;
@@ -40541,7 +40502,7 @@ class MindMapPlugin extends obsidian.Plugin {
         return __awaiter(this, void 0, void 0, function* () {
             this.settings = Object.assign({
                 canvasSize: 8000,
-                headLevel: 2,
+                headLevel: 1,
                 fontSize: 16,
                 background: 'transparent',
                 layout: 'mindmap',
@@ -40573,6 +40534,7 @@ class MindMapPlugin extends obsidian.Plugin {
         });
     }
     registerEvents() {
+        var _a, _b;
         this.registerEvent(this.app.workspace.on("file-menu", (menu, file, source, leaf) => {
             // Add a menu item to the folder context menu to create a board
             if (file instanceof obsidian.TFolder) {
@@ -40584,7 +40546,8 @@ class MindMapPlugin extends obsidian.Plugin {
                 });
             }
             //add markdown view menu  open as mind map view
-            if (leaf && this.mindmapFileModes[leaf.id || file.path] == 'markdown') {
+            const leafId = (leaf === null || leaf === void 0 ? void 0 : leaf.id) || file.path;
+            if (leaf && this.mindmapFileModes[leafId] == 'markdown') {
                 const cache = this.app.metadataCache.getFileCache(file);
                 if ((cache === null || cache === void 0 ? void 0 : cache.frontmatter) && cache.frontmatter[frontMatterKey]) {
                     menu.addItem((item) => {
@@ -40592,7 +40555,7 @@ class MindMapPlugin extends obsidian.Plugin {
                             .setTitle(`${t('Open as mindmap board')}`)
                             .setIcon("document")
                             .onClick(() => {
-                            this.mindmapFileModes[leaf.id || file.path] = mindmapViewType;
+                            this.mindmapFileModes[leafId] = mindmapViewType;
                             this.setMindMapView(leaf);
                         });
                     }).addSeparator();
@@ -40602,14 +40565,15 @@ class MindMapPlugin extends obsidian.Plugin {
         this.registerEvent(this.app.metadataCache.on("changed", (file) => {
             this.app.workspace.getLeavesOfType(mindmapViewType).forEach((leaf) => {
                 const view = leaf.view;
-                view.onFileMetadataChange(file);
+                if (view && typeof view.onFileMetadataChange === 'function') {
+                    view.onFileMetadataChange(file);
+                }
             });
         }));
-        // @ts-ignore
-        // this.app.workspace.registerHoverLinkSource(frontMatterKey, {
-        //   display: mindmapViewType,
-        //   defaultMod: true,
-        // });
+        (_b = (_a = this.app.workspace).registerHoverLinkSource) === null || _b === void 0 ? void 0 : _b.call(_a, mindmapViewType, {
+            display: 'Enhancing Mindmap',
+            defaultMod: true,
+        });
     }
     registerMonkeyAround() {
         const self = this;

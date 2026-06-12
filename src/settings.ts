@@ -3,7 +3,7 @@ export class MindMapSettings {
     canvasSize:number = 8000;
     background:string = 'transparent';
     fontSize:number = 16;
-    headLevel:number = 2;
+    headLevel:number = 1;
     layout:string="mindmap";
     layoutDirect:string = 'mindmap'
     color?:string;

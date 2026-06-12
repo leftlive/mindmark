@@ -1,6 +1,6 @@
 import History from './History'
 import * as cmd from './Cmds'
-import { uuid } from '../MindMapView'
+import { uuid } from '../utils'
 import {t} from '../lang/helpers'
 import INode from './INode'
 

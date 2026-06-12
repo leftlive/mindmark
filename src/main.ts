@@ -94,24 +94,20 @@ export default class MindMapPlugin extends Plugin {
     this.addCommand({
       id: 'Copy Node',
       name: `${t('Copy node')}`,
-      hotkeys: [
-        {
-          modifiers: ['Alt', 'Shift'],
-          key: 'C',
-        },
-      ],
-      callback: () => {
+      checkCallback: (checking: boolean) => {
         const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
-        if(mindmapView){
+        if (mindmapView) {
           var mindmap = mindmapView.mindmap;
-          navigator.clipboard.writeText('');
           var node = mindmap.selectNode;
-          if(node){
-            var text = mindmap.copyNode(node);
-            navigator.clipboard.writeText(text);
+          if (node && !node.data.isEdit) {
+            if (!checking) {
+              var text = mindmap.copyNode(node);
+              navigator.clipboard.writeText(text);
+            }
+            return true;
           }
         }
-
+        return false;
       }
     });
 
@@ -119,28 +115,25 @@ export default class MindMapPlugin extends Plugin {
     this.addCommand({
       id: 'Cut Node',
       name: `${t('Cut node')}`,
-      hotkeys: [
-        {
-          modifiers: ['Alt', 'Shift'],
-          key: 'X',
-        },
-      ],
-      callback: () => {
+      checkCallback: (checking: boolean) => {
         const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
-        if(mindmapView){
+        if (mindmapView) {
           var mindmap = mindmapView.mindmap;
-          navigator.clipboard.writeText('');
           var node = mindmap.selectNode;
-          if(node){
-            var text = mindmap.copyNode(node);
-            navigator.clipboard.writeText(text);
-            if (!node.data.isRoot && !node.data.isEdit) {
-              node.mindmap.execute("deleteNodeAndChild", { node });
-              mindmap._menuDom.style.display='none';
+          if (node && !node.data.isEdit) {
+            if (!checking) {
+              navigator.clipboard.writeText('');
+              var text = mindmap.copyNode(node);
+              navigator.clipboard.writeText(text);
+              if (!node.data.isRoot) {
+                node.mindmap.execute("deleteNodeAndChild", { node });
+                mindmap._menuDom.style.display = 'none';
+              }
             }
+            return true;
           }
         }
-
+        return false;
       }
     });
 
@@ -148,12 +141,6 @@ export default class MindMapPlugin extends Plugin {
     this.addCommand({
       id: 'Paste Node',
       name: `${t('Paste node')}`,
-      hotkeys: [
-        {
-          modifiers: ['Alt', 'Shift'],
-          key: 'V',
-        },
-      ],
       callback: () => {
         const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
         if(mindmapView){
@@ -175,12 +162,6 @@ export default class MindMapPlugin extends Plugin {
     this.addCommand({
       id: 'Undo',
       name: `${t('Undo')}`,
-      hotkeys: [
-        {
-          modifiers: ['Alt', 'Shift'],
-          key: 'Z',
-        },
-      ],
       callback: () => {
         const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
         if(mindmapView){
@@ -194,12 +175,6 @@ export default class MindMapPlugin extends Plugin {
     this.addCommand({
       id: 'Redo',
       name: `${t('Redo')}`,
-      hotkeys: [
-        {
-          modifiers: ['Alt', 'Shift'],
-          key: 'Y',
-        },
-      ],
       callback: () => {
         const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
         if(mindmapView){
@@ -238,16 +213,20 @@ export default class MindMapPlugin extends Plugin {
           key: 'F2',
         },
       ],
-      callback: () => {
+      checkCallback: (checking: boolean) => {
         const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
-        if(mindmapView){
+        if (mindmapView) {
           var mindmap = mindmapView.mindmap;
           var node = mindmap.selectNode;
           if (node && !node.data.isEdit) {
-            node.edit();
-            mindmap._menuDom.style.display = 'none';
+            if (!checking) {
+              node.edit();
+              mindmap._menuDom.style.display = 'none';
+            }
+            return true;
           }
         }
+        return false;
       }
     });
 
@@ -255,12 +234,6 @@ export default class MindMapPlugin extends Plugin {
     this.addCommand({
       id: 'Add sibling/end editing',
       name: `${t('Add sibling/end editing')}`,
-      hotkeys: [
-        {
-          modifiers: ['Alt', 'Shift'],
-          key: 'Enter',
-        },
-      ],
       callback: () => {
         const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
         if(mindmapView){
@@ -298,12 +271,6 @@ export default class MindMapPlugin extends Plugin {
     this.addCommand({
       id: 'Insert child',
       name: `${t('Insert child')}`,
-      hotkeys: [
-        {
-          modifiers: ['Shift'],
-          key: 'Insert',
-        },
-      ],
       callback: () => {
         const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
         if(mindmapView){
@@ -338,17 +305,20 @@ export default class MindMapPlugin extends Plugin {
           key: 'Delete',
         },
       ],
-      callback: () => {
+      checkCallback: (checking: boolean) => {
         const mindmapView = this.app.workspace.getActiveViewOfType(MindMapView);
-        if(mindmapView){
+        if (mindmapView) {
           var mindmap = mindmapView.mindmap;
           var node = mindmap.selectNode;
           if (node && !node.data.isRoot && !node.data.isEdit) {
-            node.mindmap.execute("deleteNodeAndChild", { node });
-            mindmap._menuDom.style.display='none';
+            if (!checking) {
+              node.mindmap.execute("deleteNodeAndChild", { node });
+              mindmap._menuDom.style.display='none';
+            }
+            return true;
           }
-          //else: Deletion makes no sense
         }
+        return false;
       }
     });
 
@@ -1203,7 +1173,7 @@ export default class MindMapPlugin extends Plugin {
   onunload() {
 
     this.app.workspace.detachLeavesOfType(mindmapViewType);
-    //this.app.workspace.unregisterHoverLinkSource(frontMatterKey);
+    (this.app.workspace as any).unregisterHoverLinkSource?.(mindmapViewType);
 
   }
 
@@ -1236,7 +1206,7 @@ export default class MindMapPlugin extends Plugin {
   async loadSettings() {
     this.settings = Object.assign({
       canvasSize: 8000,
-      headLevel: 2,
+      headLevel: 1,
       fontSize: 16,
       background: 'transparent',
       layout: 'mindmap',
@@ -1282,7 +1252,8 @@ export default class MindMapPlugin extends Plugin {
 
         //add markdown view menu  open as mind map view
 
-        if(leaf&&this.mindmapFileModes[leaf.id||file.path] == 'markdown'){
+        const leafId = (leaf as any)?.id || file.path;
+        if(leaf&&this.mindmapFileModes[leafId] == 'markdown'){
              const cache = this.app.metadataCache.getFileCache(file);
              if(cache?.frontmatter && cache.frontmatter[frontMatterKey]){
                   menu.addItem((item) => {
@@ -1290,7 +1261,7 @@ export default class MindMapPlugin extends Plugin {
                    .setTitle(`${t('Open as mindmap board')}`)
                    .setIcon("document")
                    .onClick(() => {
-                     this.mindmapFileModes[leaf.id || file.path] = mindmapViewType;
+                     this.mindmapFileModes[leafId] = mindmapViewType;
                      this.setMindMapView(leaf);
                    });
                  }).addSeparator();
@@ -1303,16 +1274,17 @@ export default class MindMapPlugin extends Plugin {
       this.app.metadataCache.on("changed", (file) => {
         this.app.workspace.getLeavesOfType(mindmapViewType).forEach((leaf) => {
           const view = leaf.view as MindMapView;
-          view.onFileMetadataChange(file);
+          if (view && typeof view.onFileMetadataChange === 'function') {
+              view.onFileMetadataChange(file);
+          }
         });
       })
     );
 
-    // @ts-ignore
-    // this.app.workspace.registerHoverLinkSource(frontMatterKey, {
-    //   display: mindmapViewType,
-    //   defaultMod: true,
-    // });
+    (this.app.workspace as any).registerHoverLinkSource?.(mindmapViewType, {
+      display: 'Enhancing Mindmap',
+      defaultMod: true,
+    });
   }
 
   registerMonkeyAround() {

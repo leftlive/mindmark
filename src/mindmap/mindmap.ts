@@ -2,10 +2,11 @@ import INode, { INodeData } from './INode'
 import Layout from './Layout'
 import { Notice, Platform } from 'obsidian'
 import SVG from 'svg.js'
-import { MindMapView } from '../MindMapView'
+import type { MindMapView } from '../MindMapView'
 import { frontMatterKey, basicFrontmatter } from '../constants';
 import Exec from './Execute'
-import {uuid} from '../MindMapView'
+import {uuid} from '../utils'
+import { FileSuggest } from './FileSuggest'
 
 import importXmind  from './import/xmindZen'
 import jsZip from 'jszip'
@@ -13,6 +14,7 @@ import { t } from 'src/lang/helpers'
 
 let deleteIcon = '<svg class="icon" width="16px" height="16.00px" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg"><path  d="M799.2 874.4c0 34.4-28 62.4-62.368 62.4H287.2a62.496 62.496 0 0 1-62.4-62.4V212h574.4v662.4zM349.6 100c0-7.2 5.6-12.8 12.8-12.8h300c7.2 0 12.768 5.6 12.768 12.8v37.6H349.6V100z m636.8 37.6H749.6V100c0-48-39.2-87.2-87.2-87.2h-300a87.392 87.392 0 0 0-87.2 87.2v37.6H37.6C16.8 137.6 0 154.4 0 175.2s16.8 37.6 37.6 37.6h112v661.6A137.6 137.6 0 0 0 287.2 1012h449.6a137.6 137.6 0 0 0 137.6-137.6V212h112c20.8 0 37.6-16.8 37.6-37.6s-16.8-36.8-37.6-36.8zM512 824c20.8 0 37.6-16.8 37.6-37.6v-400c0-20.8-16.768-37.6-37.6-37.6-20.8 0-37.6 16.8-37.6 37.6v400c0 20.8 16.8 37.6 37.6 37.6m-175.2 0c20.8 0 37.6-16.8 37.6-37.6v-400c0-20.8-16.8-37.6-37.6-37.6s-37.6 16.8-37.6 37.6v400c0.8 20.8 17.6 37.6 37.6 37.6m350.4 0c20.8 0 37.632-16.8 37.632-37.6v-400c0-20.8-16.8-37.6-37.632-37.6-20.768 0-37.6 16.8-37.6 37.6v400c0 20.8 16.8 37.6 37.6 37.6" /></svg>';
 let addIcon = '<svg class="icon" width="16px" height="16.00px" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg"><path  d="M512 1024C230.4 1024 0 793.6 0 512S230.4 0 512 0s512 230.4 512 512-230.4 512-512 512z m0-960C265.6 64 64 265.6 64 512s201.6 448 448 448 448-201.6 448-448S758.4 64 512 64z"  /><path d="M800 544H224c-19.2 0-32-12.8-32-32s12.8-32 32-32h576c19.2 0 32 12.8 32 32s-12.8 32-32 32z"  /><path  d="M512 832c-19.2 0-32-12.8-32-32V224c0-19.2 12.8-32 32-32s32 12.8 32 32v576c0 19.2-12.8 32-32 32z"  /></svg>';
+let focusIcon = '<svg class="icon" width="16px" height="16px" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg"><path d="M512 1024c-282.8 0-512-229.2-512-512s229.2-512 512-512 512 229.2 512 512-229.2 512-512 512z m0-960C264.8 64 64 264.8 64 512s200.8 448 448 448 448-200.8 448-448S759.2 64 512 64z m0 768c-176.8 0-320-143.2-320-320s143.2-320 320-320 320 143.2 320 320-143.2 320-320 320z m0-576c-141.2 0-256 114.8-256 256s114.8 256 256 256 256-114.8 256-256-114.8-256-256-256z m0 384c-70.6 0-128-57.4-128-128s57.4-128 128-128 128 57.4 128 128-57.4 128-128 128z m0-192c-35.4 0-64 28.6-64 64s28.6 64 64 64 64-28.6 64-64-28.6-64-64-64z"/></svg>';
 let tempDispLevel = 0;
 
 interface Setting {
@@ -37,6 +39,7 @@ export default class MindMap {
     path?: string;
     editNode?: INode;
     selectNode?: INode;
+    focusedNode?: INode;
     lastSelectedNode?: INode;
     // selectingNodes?:boolean;
     // selectedNodes?: INode[];
@@ -67,8 +70,9 @@ export default class MindMap {
     dispLevel:number;
     isComposing = false;
     isFocused = true;
+    fileSuggest: FileSuggest;
 
-    constructor(data: INodeData, containerEL: HTMLElement, setting?: Setting) {
+    constructor(data: INodeData, containerEL: HTMLElement, setting?: Setting, view?: MindMapView) {
         this.setting = Object.assign({
             theme: 'default',
             //canvasSize: 8000,
@@ -77,13 +81,18 @@ export default class MindMap {
             background: 'transparent',
             color: 'inherit',
             exportMdModel: 'default',
-            headLevel: 2,
+            headLevel: 1,
             layoutDirect: ''
         }, setting || {});
 
 
         this.data = data;
+        this.view = view;
+        if (view) {
+            this.fileSuggest = new FileSuggest(view.app);
+        }
         this.appEl = document.createElement('div');
+        this.appEl.setAttribute('tabindex', '0');
 
         this.appEl.classList.add('mm-mindmap');
         this.appEl.classList.add(`mm-theme-${this.setting.theme}`);
@@ -136,6 +145,7 @@ export default class MindMap {
         this.appKeydown = this.appKeydown.bind(this);
         this.appMousewheel = this.appMousewheel.bind(this);
         this.appMouseMove = this.appMouseMove.bind(this);
+        this.appContextMenu = this.appContextMenu.bind(this);
 
         this.appMouseDown = this.appMouseDown.bind(this);
         this.appMouseUp = this.appMouseUp.bind(this);
@@ -151,17 +161,54 @@ export default class MindMap {
         this.initEvent();
         //this.center();
         this.dispLevel=0;
+        this.initControlPanel();
+    }
+
+    initControlPanel() {
+        const panel = document.createElement('div');
+        panel.classList.add('mm-control-panel');
+        panel.innerHTML = `
+            <div class="mm-ctrl-btn mm-ctrl-zoom-in" title="Zoom In">+</div>
+            <div class="mm-ctrl-btn mm-ctrl-zoom-out" title="Zoom Out">-</div>
+            <div class="mm-ctrl-btn mm-ctrl-center" title="Center/Fit">⛶</div>
+        `;
+        // Append to containerEL so it stays fixed relative to the viewport, not the scaled content
+        this.containerEL.appendChild(panel);
+
+        panel.querySelector('.mm-ctrl-zoom-in').addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.setScale("up");
+        });
+        panel.querySelector('.mm-ctrl-zoom-out').addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.setScale("down");
+        });
+        panel.querySelector('.mm-ctrl-center').addEventListener('click', (e) => {
+            e.preventDefault();
+            this.fit();
+        });
     }
 
     setMenuIcon(){
         var addNodeDom = document.createElement('span');
         var deleteNodeDom = document.createElement('span');
+        var focusNodeDom = document.createElement('span');
+        
         addNodeDom.classList.add('mm-icon-add-node');
         deleteNodeDom.classList.add('mm-icon-delete-node');
+        focusNodeDom.classList.add('mm-icon-focus-node');
+        
         addNodeDom.innerHTML = addIcon;
         deleteNodeDom.innerHTML = deleteIcon;
+        focusNodeDom.innerHTML = focusIcon;
+        
+        addNodeDom.title = "Add Child Node";
+        deleteNodeDom.title = "Delete Node";
+        focusNodeDom.title = "Focus Node";
+        
         this._menuDom.appendChild(addNodeDom);
         this._menuDom.appendChild(deleteNodeDom);
+        this._menuDom.appendChild(focusNodeDom);
     }
 
     setAppSetting() {
@@ -304,6 +351,7 @@ export default class MindMap {
 
     initEvent() {
         this.appEl.addEventListener('click', this.appClickFn);
+        this.appEl.addEventListener('contextmenu', this.appContextMenu);
         this.appEl.addEventListener('mouseover', this.appMouseOverFn);
         this.appEl.addEventListener('dblclick', this.appDblclickFn);
         this.appEl.addEventListener('dragstart', this.appDragstart);
@@ -334,6 +382,7 @@ export default class MindMap {
 
     removeEvent() {
         this.appEl.removeEventListener('click', this.appClickFn);
+        this.appEl.removeEventListener('contextmenu', this.appContextMenu);
         this.appEl.removeEventListener('dragstart', this.appDragstart);
         this.appEl.removeEventListener('dragover', this.appDragover);
         this.appEl.removeEventListener('dragend', this.appDragend);
@@ -407,42 +456,129 @@ export default class MindMap {
         // }
 
         if (!ctrlKey && !shiftKey && !altKey) { // No special key
-            // // tab
-            // // tab (OK) / Insert (OK)
-            // if (keyCode == 9 || keyCode == 45) {
-            //     e.preventDefault();
-            //     e.stopPropagation();
-            // }
+            // Focus Mode: F key (70)
+            if (keyCode == 70) {
+                var node = this.selectNode;
+                if (node && !node.data.isEdit) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (this.focusedNode === node) {
+                        this.focusedNode = undefined;
+                    } else {
+                        this.focusedNode = node;
+                    }
+                    this.refresh();
+                    this.centerOnNode(this.focusedNode || this.root);
+                }
+            }
 
-            // // Space
-            // if (keyCode == 32) {
-            //     var node = this.selectNode;
-            //     if (node && !node.data.isEdit) {
-            //         e.preventDefault();
-            //         e.stopPropagation();
-            //         node.edit();
-            //         this._menuDom.style.display = 'none';
-            //     }
-            // }
+            // Esc key (27) to exit Focus Mode
+            if (keyCode == 27) {
+                if (this.focusedNode) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.focusedNode = undefined;
+                    this.refresh();
+                    this.centerOnNode(this.root);
+                }
+            }
+            // Space
+            if (keyCode == 32) {
+                var node = this.selectNode;
+                if (node && !node.data.isEdit) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    node.edit();
+                    this._menuDom.style.display = 'none';
+                }
+            }
 
+            // Enter
+            if (keyCode == 13 || e.key =='Enter') {
+                var node = this.selectNode;
+                if(node) {
+                    if (!node.data.isEdit) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (!node.parent) return;
+                        var newNode = node.mindmap.execute('addSiblingNode', {
+                            parent: node.parent
+                        });
+                        this._menuDom.style.display='none';
+                        this.moveNode(newNode, node, 'down', false);
+                    }
+                    else {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        this.clearSelectNode();
+                        node.select();
+                        node.mindmap.editNode=null;
+                    }
+                }
+            }
 
+            // Delete / Backspace
+            if (keyCode == 46 || e.key == 'Delete' || e.key == 'Backspace') {
+                var node = this.selectNode;
+                if (node && !node.data.isRoot && !node.data.isEdit) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    node.mindmap.execute("deleteNodeAndChild", { node });
+                    this._menuDom.style.display='none';
+                }
+            }
+
+            // Tab / Insert
+            if (keyCode == 9 || keyCode == 45 || e.key == 'Tab') {
+                var node = this.selectNode;
+                if(node) {
+                    if (!node.data.isEdit) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (!node.isExpand) {
+                            node.expand();
+                        }
+                        node.mindmap.execute("addChildNode", { parent: node });
+                        this._menuDom.style.display='none';
+                    } else{
+                        e.preventDefault();
+                        e.stopPropagation();
+                        this.clearSelectNode();
+                        node.select();
+                        node.mindmap.editNode=null;
+                    }
+                }
+            }
+
+            // Escape
+            if (keyCode == 27) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                var node = this.selectNode;
+                if (node && node.data.isEdit) {
+                    node.select();
+                    node.mindmap.editNode = null;
+                    node.cancelEdit();
+                    this.undo();
+                }
+            }
         }
 
-
         if (ctrlKey && !shiftKey && !altKey) {  // CTRL key
-        //     //ctrl + y
-        //     if (keyCode == 89) {
-        //         e.preventDefault();
-        //         e.stopPropagation();
-        //         this.redo();
-        //     }
+            //ctrl + y
+            if (keyCode == 89) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.redo();
+            }
 
-        //     //ctrl + z
-        //     if (keyCode == 90) {
-        //         e.preventDefault();
-        //         e.stopPropagation();
-        //         this.undo();
-        //     }
+            //ctrl + z
+            if (keyCode == 90) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.undo();
+            }
         }
 
             // Shift + F2 : Edit as space does
@@ -490,84 +626,6 @@ export default class MindMap {
         // }
 
         if (!ctrlKey && !shiftKey && !altKey) { // NO SPECIAL KEY
-            // Enter
-            // if (keyCode == 13 || e.key =='Enter') {
-            //     var node = this.selectNode;
-            //     e.preventDefault();
-            //     e.stopPropagation();
-            //     if(node) {// A node is selected
-            //         if (!node.data.isEdit) {// Not editing a node => Add sibling node
-            //             if (!node.isExpand) {
-            //                 node.expand();
-            //             }
-            //             if (!node.parent) return;
-            //             node.mindmap.execute('addSiblingNode', {
-            //                 parent: node.parent
-            //             });
-            //             this._menuDom.style.display='none';
-            //         }
-            //         else {// Editing mode => end edit mode
-            //             //node.cancelEdit();
-
-            //             this.clearSelectNode();
-            //             node.select();
-            //             node.mindmap.editNode=null;
-            //             //this.selectNode.unSelect();
-            //         }
-            //     }
-            //     //else: no node selected: nothing to do
-            // }
-
-            //delete
-            // if (keyCode == 46 || e.key == 'Delete' || e.key == 'Backspace') {
-            //     var node = this.selectNode;
-            //     if (node && !node.data.isRoot && !node.data.isEdit) {
-            //         e.preventDefault();
-            //         e.stopPropagation();
-            //         node.mindmap.execute("deleteNodeAndChild", { node });
-            //         this._menuDom.style.display='none';
-            //     }
-            //     //else: Deletion makes no sense
-            // }
-
-
-            // Tab / Insert
-            // if (keyCode == 9 || keyCode == 45 || e.key == 'Tab') {
-            //     e.preventDefault();
-            //     e.stopPropagation();
-            //     var node = this.selectNode;
-            //     if(node) {
-            //         if (!node.data.isEdit) {// Not editing
-            //             if (!node.isExpand) {
-            //                 node.expand();
-            //             }
-            //             node.mindmap.execute("addChildNode", { parent: node });
-            //             this._menuDom.style.display='none';
-            //         } else{
-            //             // this.selectNode.unSelect();
-            //             this.clearSelectNode();
-            //             node.select();
-            //             node.mindmap.editNode=null;
-            //         }
-            //     }
-            //     //else: no node selected -> nothing to do
-            // }
-
-                // Escape
-            if (keyCode == 27) {
-                e.preventDefault();
-                e.stopPropagation();
-
-                var node = this.selectNode;
-                if (node && node.data.isEdit) {
-                    node.select();
-                    node.mindmap.editNode = null;
-                    node.cancelEdit();
-                    this.undo();
-                    //this.selectNode.unSelect();
-                }
-            }
-
             // up
             if (keyCode == 38 || e.key == 'ArrowUp') {
                 e.preventDefault();
@@ -1507,17 +1565,19 @@ export default class MindMap {
 
         if (targetEl) {
 
-            if (targetEl.tagName == 'A' && targetEl.hasClass("internal-link")) {
+            var internalLink = targetEl.closest('a.internal-link');
+            if (internalLink) {
                 evt.preventDefault();
-                var targetEl = evt.target as HTMLElement;
-                var href = targetEl.getAttr("href");
-                if(href){
+                evt.stopPropagation();
+                var href = internalLink.getAttribute("data-href") || internalLink.getAttribute("href");
+                if (href) {
                     this.view.app.workspace.openLinkText(
                         href,
                         this.view.file.path,
                         evt.ctrlKey || evt.metaKey
                     );
                 }
+                return;
             }
 
             if (targetEl.hasClass('mm-node-bar')) {
@@ -1554,6 +1614,20 @@ export default class MindMap {
                        this._menuDom.style.display='none';
                     }
                  }
+                 
+                 if(targetEl.closest('.mm-icon-focus-node')){
+                    var selectNode = this.selectNode;
+                    if(selectNode && !selectNode.data.isEdit){
+                       if (this.focusedNode === selectNode) {
+                           this.focusedNode = undefined;
+                       } else {
+                           this.focusedNode = selectNode;
+                       }
+                       this.refresh();
+                       this.centerOnNode(this.focusedNode || this.root);
+                       this._menuDom.style.display='none';
+                    }
+                 }
                  return;
             }
 
@@ -1564,16 +1638,48 @@ export default class MindMap {
                     this.clearSelectNode();
                     this.selectNode = node;
                     this.selectNode?.select();
-                    // this._menuDom.style.display='block';
-                    this._menuDom.style.display='none';
-                    var box = this.selectNode.getBox();
-                    // this._menuDom.style.left = `${box.x + box.width + 10}px`;
-                    // this._menuDom.style.top = `${box.y + box.height/2 - 14}px`;
                 }
+                this._menuDom.style.display='none';
             } else {
                 this.clearSelectNode();
                 this._menuDom.style.display='none';
             }
+        }
+    }
+
+    appContextMenu(evt: MouseEvent) {
+        if (!this.isFocused) return;
+        
+        let targetEl = evt.target as HTMLElement;
+        if (targetEl.closest('.mm-node')) {
+            evt.preventDefault();
+            evt.stopPropagation();
+            
+            var id = targetEl.closest('.mm-node').getAttribute('data-id');
+            var node = this.getNodeById(id);
+            
+            this.clearSelectNode();
+            this.selectNode = node;
+            this.selectNode?.select();
+            
+            this._menuDom.style.display = 'flex';
+            
+            // Calculate position
+            var box = this.selectNode.getBox();
+            var rootPos = this.root.getBox();
+            
+            // If the node is on the left side of the root (or is root), we might position differently
+            // Usually we show it on the outer edge
+            if (box.x < rootPos.x) {
+                // Node is on the left side of root, place menu on the left of the node
+                this._menuDom.style.left = `${box.x - 40}px`;
+            } else {
+                // Node is on the right side of root (or is root), place menu on the right
+                this._menuDom.style.left = `${box.x + box.width + 10}px`;
+            }
+            
+            // Vertically center with the node
+            this._menuDom.style.top = `${box.y + box.height/2 - 45}px`; 
         }
     }
 
@@ -1762,17 +1868,21 @@ export default class MindMap {
 
     appMouseOverFn(evt: MouseEvent) {
         const targetEl = evt.target as HTMLElement;
+        const linkEl = targetEl.closest("a.internal-link") as HTMLElement;
+        const sourcePath = this.view?.file?.path;
 
-        if (targetEl.tagName !== "A") return;
-
-        if (targetEl.hasClass("internal-link")) {
+        if (linkEl && sourcePath) {
+            const linktext = linkEl.getAttribute("data-href") || linkEl.getAttribute("href") || linkEl.innerText;
+            if (!linktext) {
+                return;
+            }
             this.view.app.workspace.trigger("hover-link", {
                 event: evt,
-                source: frontMatterKey,
+                source: "preview",
                 hoverParent: this.view,
-                targetEl,
-                linktext: targetEl.getAttr("href"),
-                sourcePath: this.view.file.path,
+                targetEl: linkEl,
+                linktext,
+                sourcePath,
             });
         }
     }
@@ -2090,15 +2200,61 @@ export default class MindMap {
 
     //layout
     layout() {
+        var activeRoot = this.focusedNode || this.root;
+
+        // Ensure all nodes are display: block to maintain layout space
+        // and remove any previously added dimmed classes
+        this.traverseBF((n: INode) => {
+            n.containEl.style.display = 'block';
+            n.containEl.classList.remove('mm-node-dimmed');
+        }, this.root);
+
+        // ALWAYS layout from this.root so the tree shape does not change
         if (!this.mmLayout) {
-            this.mmLayout = new Layout(this.root, this.setting.layoutDirect||'mind map', this.colors);
-            // Select and center on the mindmap's root when opening it
-            this.root.select();
-            this.centerOnNode(this.root);
-            return;
+            this.mmLayout = new Layout(this.root, this.setting.layoutDirect||'mind map', this.colors, this);
+            activeRoot.select();
+            this.centerOnNode(activeRoot);
+        } else {
+            this.mmLayout.layout(this.root, this.setting.layoutDirect || this.mmLayout.direct || 'mind map');
         }
 
-        this.mmLayout.layout(this.root, this.setting.layoutDirect || this.mmLayout.direct || 'mind map');
+        // Apply Focus Mode AFTER layout finishes
+        if (this.focusedNode) {
+            let activeSubtree = new Set<INode>();
+            this.traverseBF((n: INode) => activeSubtree.add(n), activeRoot);
+            
+            this.traverseBF((n: INode) => {
+                if (!activeSubtree.has(n)) {
+                    n.containEl.classList.add('mm-node-dimmed');
+                    n.containEl.style.opacity = '0';
+                    n.containEl.style.visibility = 'hidden';
+                    n.containEl.style.pointerEvents = 'none';
+                } else {
+                    n.containEl.classList.remove('mm-node-dimmed');
+                    n.containEl.style.opacity = '1';
+                    n.containEl.style.visibility = 'visible';
+                    n.containEl.style.pointerEvents = 'auto';
+                }
+            }, this.root);
+            
+            this.appEl.style.backgroundColor = 'rgba(0, 0, 0, 0.4)';
+            this.appEl.style.boxShadow = 'inset 0 0 150px rgba(0,0,0,0.5)';
+        } else {
+            this.traverseBF((n: INode) => {
+                n.containEl.classList.remove('mm-node-dimmed');
+                n.containEl.style.opacity = '1';
+                n.containEl.style.visibility = 'visible';
+                n.containEl.style.pointerEvents = 'auto';
+            }, this.root);
+            
+            this.appEl.style.backgroundColor = '';
+            this.appEl.style.boxShadow = '';
+        }
+
+        // Redraw SVG links so they can inherit the dimmed status of the nodes
+        if (this.mmLayout && this.mmLayout.createLink) {
+            this.mmLayout.createLink();
+        }
 
     }
 
@@ -2164,6 +2320,45 @@ export default class MindMap {
         }
     }
 
+    fit() {
+        if (!this.root) return;
+        var activeRoot = this.focusedNode || this.root;
+
+        var minX = Infinity;
+        var minY = Infinity;
+        var maxX = -Infinity;
+        var maxY = -Infinity;
+
+        this.traverseBF((n: INode) => {
+            if (n.containEl.style.display === 'none') return;
+            var pos = n.getPosition();
+            var dim = n.getDimensions();
+            if (pos.x < minX) minX = pos.x;
+            if (pos.y < minY) minY = pos.y;
+            if (pos.x + dim.x > maxX) maxX = pos.x + dim.x;
+            if (pos.y + dim.y > maxY) maxY = pos.y + dim.y;
+        }, activeRoot);
+
+        if (minX === Infinity) return;
+
+        var w = this.containerEL.clientWidth;
+        var h = this.containerEL.clientHeight;
+        
+        var contentW = maxX - minX + 200; // padding
+        var contentH = maxY - minY + 200; // padding
+
+        var scaleX = w / contentW;
+        var scaleY = h / contentH;
+        var newScale = Math.min(scaleX, scaleY, 1);
+
+        this.scale(newScale * 100);
+
+        var centerX = minX + (maxX - minX) / 2;
+        var centerY = minY + (maxY - minY) / 2;
+
+        this.containerEL.scrollLeft = centerX - w / 2;
+        this.containerEL.scrollTop = centerY - h / 2;
+    }
 
     _resetMaxDisplayedLevel() {
         this.dispLevel = 0;
@@ -2308,16 +2503,19 @@ export default class MindMap {
                 hPrefix = '\n';
             }
             const ending = n.isExpand ? '' : ` ^${n.getId()}`
-            if (n.getLevel() < level) {
+            
+            let actualLevel = Math.min(level, 6);
+            if (n.getLevel() < actualLevel) {
                 for (let i = 0; i < l; i++) {
                     hPrefix += '#';
                 }
                 md += (hPrefix + ' ');
-                md += n.getData().text.trim() + ending + '\n';
+                let headingText = n.getData().text.trim().replace(/\n/g, '<br>');
+                md += headingText + ending + '\n';
 
             } else {
-                for (var i = 0; i < n.getLevel() - level; i++) {
-                    space += '\t';
+                for (var i = 0; i < n.getLevel() - actualLevel; i++) {
+                    space += '    ';
                 }
                 var text = n.getData().text.trim();
                 if (text) {
@@ -2337,25 +2535,11 @@ export default class MindMap {
                             md+='\n'
                         } else {
                             //text
-                            md += `${space}- `;
-                            textArr.forEach((t: string, i: number) => {
-                                var contentText = "void";
-                                if(t.trim().length > 0){
-                                    contentText = t.trim();
-                                }
-                                if (i > 0) {
-                                    md += `${space}${contentText}${i === textArr.length - 1 ? ending : '' }\n`
-                                } else {
-                                    md += `${contentText}\n`
-                                }
-                            });
+                            let singleLineText = text.replace(/\n/g, '<br>');
+                            md += `${space}- ${singleLineText}${ending}\n`;
                         }
-
                     }
                 } else {
-                    for (var i = 0; i < n.getLevel() - level; i++) {
-                        space += '   ';
-                    }
                     md += `${space}-\n`;
                 }
             }

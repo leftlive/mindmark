@@ -70,7 +70,10 @@ export default class Node {
     isHide:boolean=false;
     stroke?:string;
     //isEdit:boolean=false;
+    isLeft: boolean;
     _barDom:HTMLElement=null;
+    _inputHandler: (e: Event) => void;
+    _keydownHandler: (e: KeyboardEvent) => void;
     data:any
     constructor( data:INode,mindMap?:MindMap){
        this.data = data;
@@ -103,6 +106,7 @@ export default class Node {
             this.data.isRoot = false;
             this.containEl.classList.remove('mm-root');
         }
+        
         this.parseText();
     }
 
@@ -114,15 +118,42 @@ export default class Node {
 
     parseText(){
         if (this.data.text.length === 0){
-            this.data.text = "Sub title";
+            this.data.text = t("Sub title");
         }
         MarkdownRenderer.renderMarkdown( this.data.text ,this.contentEl,this.mindmap.path||"",null).then(()=>{
             this.data.mdText = this.contentEl.innerHTML;
+            this.registerInternalLinkHover();
             this.refreshBox();
             this.mindmap&&this.mindmap.emit('initNode',{});
             this._delay();
         });
 
+    }
+
+    registerInternalLinkHover() {
+        this.contentEl.querySelectorAll("a.internal-link").forEach((linkEl: HTMLElement) => {
+            linkEl.addEventListener("mouseover", (evt: MouseEvent) => {
+                evt.stopPropagation();
+                const sourcePath = this.mindmap?.view?.file?.path || this.mindmap?.path || "";
+                const linktext =
+                    linkEl.getAttribute("data-href") ||
+                    linkEl.getAttribute("href") ||
+                    linkEl.innerText;
+
+                if (!sourcePath || !linktext || !this.mindmap?.view) {
+                    return;
+                }
+
+                this.mindmap.view.app.workspace.trigger("hover-link", {
+                    event: evt,
+                    source: "preview",
+                    hoverParent: this.mindmap.view,
+                    targetEl: linkEl,
+                    linktext,
+                    sourcePath,
+                });
+            });
+        });
     }
 
     _delay(){
@@ -280,6 +311,46 @@ export default class Node {
         if(!this.containEl.classList.contains('mm-edit-node')){
             this.containEl.classList.add('mm-edit-node')
         }
+
+        if (!this._inputHandler) {
+            this._inputHandler = (e: Event) => {
+                if (!this.mindmap.fileSuggest) return;
+                const text = this.contentEl.innerText;
+                const selection = window.getSelection();
+                if (selection && selection.rangeCount > 0) {
+                    const range = selection.getRangeAt(0);
+                    const preCursorRange = range.cloneRange();
+                    preCursorRange.selectNodeContents(this.contentEl);
+                    preCursorRange.setEnd(range.endContainer, range.endOffset);
+                    const textBeforeCursor = preCursorRange.toString();
+                    
+                    const matchIndex = textBeforeCursor.lastIndexOf('[[');
+                    if (matchIndex !== -1) {
+                        const query = textBeforeCursor.substring(matchIndex + 2);
+                        const closingIndex = textBeforeCursor.indexOf(']]', matchIndex);
+                        if (closingIndex === -1) {
+                            const rect = range.getBoundingClientRect();
+                            this.mindmap.fileSuggest.open(this, rect, query);
+                            return;
+                        }
+                    }
+                }
+                this.mindmap.fileSuggest.close();
+            };
+        }
+        
+        if (!this._keydownHandler) {
+            this._keydownHandler = (e: KeyboardEvent) => {
+                if (this.mindmap.fileSuggest?.isOpen) {
+                    if (this.mindmap.fileSuggest.handleKeydown(e)) {
+                        return;
+                    }
+                }
+            };
+        }
+        
+        this.contentEl.addEventListener('input', this._inputHandler);
+        this.contentEl.addEventListener('keydown', this._keydownHandler);
     }
 
     selectText() {
@@ -498,6 +569,12 @@ export default class Node {
 
 
     cancelEdit(){
+        if(!this.data.isEdit) return;
+        this.mindmap.fileSuggest?.close();
+        this.contentEl.removeEventListener('input', this._inputHandler);
+        this.contentEl.removeEventListener('keydown', this._keydownHandler);
+        this.contentEl.removeAttribute('contentEditable');
+        
         console.log("CancelEdit");
         var text = this.contentEl.innerText.trim()||'';
         if(text.length == 0){
@@ -508,6 +585,7 @@ export default class Node {
 
         MarkdownRenderer.renderMarkdown(text,this.contentEl,this.mindmap.path||"",null).then(()=>{
             this.data.mdText = this.contentEl.innerHTML;
+            this.registerInternalLinkHover();
             this.refreshBox();
             this._delay();
         });
@@ -520,13 +598,12 @@ export default class Node {
             });
          }
 
-        this.contentEl.setAttribute('contentEditable','false');
+        this.contentEl.removeAttribute('contentEditable');
         this.data.isEdit = false;
 
         if(this.containEl.classList.contains('mm-edit-node')){
             this.containEl.classList.remove('mm-edit-node')
         }
-
     }
 
     getLevel() {

@@ -1,6 +1,5 @@
 import Node from './INode'
 import MindMap from './mindmap';
-import randomColor  from 'randomcolor';
 
 export default class Layout {
     layoutName='mindmap';
@@ -16,13 +15,16 @@ export default class Layout {
     lefts:Node[]=[];
     rights:Node[]=[];
     colors:string[]=[];
-    lineWidth=2;
-    constructor(node:Node,direct?:string,colors?:string[]){
+    lineWidth = 1;
+    constructor(node:Node,direct?:string,colors?:string[], mind?:MindMap){
        this.root = node||null;
-       this.mind = node?.mindmap||null;
+       this.mind = mind || node?.mindmap || null;
        this.direct = direct||'mindmap';
        this.colors=colors||[];
       
+       if (!this.mind?.edgeGroup) {
+           return;
+       }
        if (!this.svgDom) this.svgDom = this.mind.edgeGroup.group();
 
        this.layout();
@@ -422,7 +424,7 @@ export default class Layout {
 
 				childBox.height = childBox.height + lineWidth;
 
-				let _stroke =  node.stroke?node.stroke:(child.stroke?child.stroke:randomColor());
+				let _stroke =  node.stroke?node.stroke:(child.stroke?child.stroke:'var(--text-muted)');
 
                 if(!child.stroke){
                     child.stroke = _stroke;
@@ -431,62 +433,37 @@ export default class Layout {
                 child._barDom.style.backgroundColor = _stroke;
                 child._barDom.style.borderColor = _stroke;
 
+				child.containEl.style.setProperty('--node-stroke', _stroke);
+
 				if (level == rootLevel) {
 					var from = {
 						x: pos.x + box.width / 2,
 						y: pos.y + box.height / 2
 					};
-				} else if (level == 1 + rootLevel) {
-					if (direct == 'right') {
-						 from = {
-							x: pos.x + box.width,
-							y: pos.y + box.height / 2
-						};
-					} else {
-						 from = {
-							x: pos.x,
-							y: pos.y + box.height / 2
-						}
-					}
-
 				} else {
 					if (direct == 'right') {
-						 from = {
+						var from = {
 							x: pos.x + box.width,
-							y: pos.y + box.height
+							y: pos.y + box.height / 2
 						};
 					} else {
-						 from = {
+						var from = {
 							x: pos.x,
-							y: pos.y + box.height
+							y: pos.y + box.height / 2
 						};
 					}
 				}
 
-				if (level == rootLevel) {
-					if (direct == 'right') {
-						var to = {
-							x: childPos.x,
-							y: childBox.height / 2 + childPos.y
-						};
-					} else {
-						 to = {
-							x: childPos.x + childBox.width,
-							y: childBox.height / 2 + childPos.y
-						};
-					}
+				if (direct == 'right') {
+					var to = {
+						x: childPos.x,
+						y: childBox.height / 2 + childPos.y
+					};
 				} else {
-					if (direct == 'right') {
-						 to = {
-							x: childPos.x,
-							y: childBox.height + childPos.y
-						};
-					} else {
-						 to = {
-							x: childPos.x + childBox.width,
-							y: childBox.height + childPos.y
-						};
-					}
+					var to = {
+						x: childPos.x + childBox.width,
+						y: childBox.height / 2 + childPos.y
+					};
 				}
 
 
@@ -504,6 +481,14 @@ export default class Layout {
 					var y2 = parseInt(to.y+'');
 				}
 
+				if (
+					!node.isShow() || !child.isShow() ||
+					node.containEl.classList.contains('mm-node-dimmed') ||
+					child.containEl.classList.contains('mm-node-dimmed')
+				) {
+					createLine(child);
+					return;
+				}
 
 				if (level == rootLevel) {
 					var line1 = me.svgDom.path().stroke({
@@ -536,23 +521,31 @@ export default class Layout {
 				}
 
 				if (level == rootLevel) {
+					var cpx11 = {
+						x: from.x + dis / 2,
+						y: from.y
+					};
+					var cpx12 = {
+						x: from.x + dis / 2,
+						y: to.y
+					};
+					if (direct == 'left') {
+						cpx11.x = from.x - dis / 2;
+						cpx12.x = from.x - dis / 2;
+					}
 
-					var cpx1 = parseInt(from.x+'') + (to.x - from.x) / 9;
-					var cpy1 = parseInt(from.y+'') + (to.y - from.y) / 9 * 8;
-					var cpx2 = parseInt(from.x + (to.x - from.x) / 9 * 8+'');
-					var cpy2 = parseInt(to.y+'');
-
-					var pathStr = `M${x1} ${y1}  C ${cpx1} ${cpy1}, ${cpx2} ${cpy2}, ${x2} ${y2}`;
+					var pathStr = `M${x1} ${y1}  C ${cpx11.x} ${cpx11.y}, ${cpx12.x} ${cpx12.y}, ${x2} ${y2}`;
 					line1.plot(pathStr);
 
 				} else {
 
-					me.svgDom.line(x11, y11, x22, y22).stroke({
-						color: _stroke,
-						width: lineWidth,
-						linecap: 'miter',
-						linejoin: 'miter'
-					}).fill('none');
+					// Underline removed for card-style layout
+					// me.svgDom.line(x11, y11, x22, y22).stroke({
+					// 	color: _stroke,
+					// 	width: lineWidth,
+					// 	linecap: 'miter',
+					// 	linejoin: 'miter'
+					// }).fill('none');
 
 					//var c = parseInt((to.y - from.y) / 6+'');
 					 var cpx11 = {
@@ -574,7 +567,6 @@ export default class Layout {
 					cpx12.y = parseInt(cpx12.y+'');
 
 					var path = `M${x1} ${y1}  C ${cpx11.x} ${cpx11.y}, ${cpx12.x} ${cpx12.y}, ${x2} ${y2}`;
-
 					line1.plot(path);
 
 				}
@@ -583,10 +575,20 @@ export default class Layout {
 			});
 		}
 
+		const obsidianColors = [
+			'var(--mm-color-1)',
+			'var(--mm-color-2)',
+			'var(--mm-color-3)',
+			'var(--mm-color-4)',
+			'var(--mm-color-5)',
+			'var(--mm-color-6)',
+			'var(--mm-color-7)',
+			'var(--mm-color-8)'
+		];
 
         //Set Node link Color
         this.root.children.forEach((c:Node,i:number)=>{
-            c.stroke=this.colors[i]||randomColor();
+            c.stroke = obsidianColors[i % obsidianColors.length];
         });
 
 		createLine(root);
