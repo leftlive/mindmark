@@ -286,6 +286,15 @@
     background: var(--interactive-hover);
 }
 
+.mm-ctrl-new-mindmap {
+    color: var(--text-on-accent);
+    background: var(--interactive-accent);
+}
+
+.mm-ctrl-new-mindmap:hover {
+    background: var(--interactive-accent-hover);
+}
+
 /* Morandi & Soft Palette for Mindmap Nodes */
 .theme-light {
     --mm-color-1: #D28282;

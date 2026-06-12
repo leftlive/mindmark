@@ -8260,6 +8260,7 @@ class MindMap {
         panel.classList.add('mm-control-panel');
         panel.innerHTML = `
             <div class="mm-control-group">
+                <div class="mm-ctrl-btn mm-ctrl-new-mindmap" title="${t('Create new mindmap')}" aria-label="${t('Create new mindmap')}">＋</div>
                 <div class="mm-ctrl-btn mm-ctrl-undo" title="Undo">↶</div>
                 <div class="mm-ctrl-btn mm-ctrl-redo" title="Redo">↷</div>
                 <div class="mm-ctrl-btn mm-ctrl-export-png" title="Export PNG">📷</div>
@@ -8273,6 +8274,11 @@ class MindMap {
         `;
         // Append to containerEL so it stays fixed relative to the viewport, not the scaled content
         this.containerEL.appendChild(panel);
+        panel.querySelector('.mm-ctrl-new-mindmap').addEventListener('click', (e) => {
+            var _a;
+            e.stopPropagation();
+            (_a = this.view) === null || _a === void 0 ? void 0 : _a.plugin.newMindMap();
+        });
         panel.querySelector('.mm-ctrl-undo').addEventListener('click', (e) => {
             e.stopPropagation();
             this.undo();
