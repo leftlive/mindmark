@@ -465,12 +465,12 @@ export default class MindMap {
                     e.preventDefault();
                     e.stopPropagation();
                     if (this.focusedNode === node) {
-                        this.focusedNode = undefined;
+                        this.exitFocusMode();
                     } else {
                         this.focusedNode = node;
+                        this.refresh();
+                        this.centerOnNode(node);
                     }
-                    this.refresh();
-                    this.centerOnNode(this.focusedNode || this.root);
                 }
             }
 
@@ -479,9 +479,7 @@ export default class MindMap {
                 if (this.focusedNode) {
                     e.preventDefault();
                     e.stopPropagation();
-                    this.focusedNode = undefined;
-                    this.refresh();
-                    this.centerOnNode(this.root);
+                    this.exitFocusMode();
                 }
             }
             // Space
@@ -1622,12 +1620,12 @@ export default class MindMap {
                     var selectNode = this.selectNode;
                     if(selectNode && !selectNode.data.isEdit){
                        if (this.focusedNode === selectNode) {
-                           this.focusedNode = undefined;
+                           this.exitFocusMode();
                        } else {
                            this.focusedNode = selectNode;
+                           this.refresh();
+                           this.centerOnNode(selectNode);
                        }
-                       this.refresh();
-                       this.centerOnNode(this.focusedNode || this.root);
                        this._menuDom.style.display='none';
                     }
                  }
@@ -2270,6 +2268,19 @@ export default class MindMap {
 
     refresh() {
         this.layout();
+    }
+
+    exitFocusMode() {
+        const previouslyFocusedNode = this.focusedNode;
+        if (!previouslyFocusedNode) {
+            return;
+        }
+
+        this.focusedNode = undefined;
+        this.refresh();
+        this.clearSelectNode();
+        previouslyFocusedNode.select();
+        this.centerOnNode(previouslyFocusedNode);
     }
 
     emit(name: string, data?: any) {

@@ -81,6 +81,10 @@ Expected `activeType` is `mindmapViewUpgraded`.
 
 ## Recent Bugs And Fixes
 
+### Focus mode exit selection
+
+All focus-mode exit paths use `MindMap.exitFocusMode()`. It restores normal visibility, reselects the previously focused node, and centers that node instead of returning selection to the root.
+
 ### Markdown view return button
 
 Mind map files displayed as Markdown have a `blocks` action beside the Markdown reading/editing mode button. `MindMapPlugin.updateMarkdownMindMapActions()` owns this button, shows it only when the file has `mindmap-plugin` frontmatter, and prevents duplicate actions across layout updates.
